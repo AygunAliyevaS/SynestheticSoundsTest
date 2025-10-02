@@ -4,12 +4,8 @@ app = Flask(__name__)
 
 @app.route("/")
 def home():
-    return render_template("index.html")
-
-@app.route("/gif/<filename>")
-def serve_gif(filename):
-    return send_from_directory("static", filename)
-
+    return 'good'
+    
 @app.route("/health")
 def health():
     return "OK", 200
