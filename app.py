@@ -5,7 +5,7 @@ import msal
 
 app = Flask(__name__)
 app.secret_key = "test-secret"  # replace with something secure
-app.config["SESSION_TYPE"] = "filesystem"
+app.config["SESSION_TYPE"] = "null"  # use signed cookies only
 Session(app)
 
 # 🔹 Put your Entra ID settings here (use Azure App Service → Configuration in production)
