@@ -831,57 +831,68 @@ def submit():
     pixels = img.load()
     width, height = img.size
 
-    # List of (set_of_note_names, pixel_width)
+    # We'll collect segments: (dict_of_note_to_weight, pixel_width)
     segments = []
-    current_notes = set()
+    current_note_weights = {}  # note_name -> total pixel count in this column group
     start_x = 0
 
-    print("\nReading your drawing...")
+    print("\nAnalyzing drawing with thickness-aware volume...")
 
     for x in range(width + 1):
-        column_notes = set()
+        column_pixel_counts = {}  # color_rgb -> count of non-transparent pixels
 
         if x < width:
             for y in range(height):
                 r, g, b, a = pixels[x, y]
 
-                # Skip transparent or nearly transparent pixels
+                # Skip transparent or background
                 if a < 128:
                     continue
-
-                # Skip very dark or gray pixels (background/noise)
-                if max(r, g, b) < 60 or abs(r - g) < 20 and abs(g - b) < 20 and abs(r - b) < 20:
+                if max(r, g, b) < 60 or (abs(r-g) < 20 and abs(g-b) < 20 and abs(r-b) < 20):
                     continue
 
-                note_name = get_note_from_color(r, g, b)
+                rgb = (r, g, b)
+                column_pixel_counts[rgb] = column_pixel_counts.get(rgb, 0) + 1
 
-                # If multiple possible notes (from list), pick the first
-                if isinstance(note_name, list):
-                    note_name = note_name[0]
+        # Convert RGB counts → note names with weights
+        new_note_weights = {}
+        total_active_pixels = sum(column_pixel_counts.values())
+
+        if total_active_pixels > 0:
+            for rgb, count in column_pixel_counts.items():
+                note_candidates = get_note_from_color(*rgb)
+
+                # Handle case where one color maps to multiple possible notes
+                if isinstance(note_candidates, list):
+                    note_name = note_candidates[0]  # pick first, or you can prefer higher octave
+                else:
+                    note_name = note_candidates
 
                 if note_name:
-                    column_notes.add(note_name)
+                    # Weight = how many pixels this color has (thickness)
+                    new_note_weights[note_name] = new_note_weights.get(note_name, 0) + count
 
-        # Detect change in note set
-        if column_notes != current_notes:
-            if current_notes and start_x < x:
+        # Detect change in note set or significant weight change
+        if new_note_weights != current_note_weights:
+            if current_note_weights and start_x < x:
                 px_width = x - start_x
-                segments.append((current_notes.copy(), px_width))
-                print(f"→ Notes {sorted(current_notes)} over {px_width}px")
+                segments.append((current_note_weights.copy(), px_width))
+                print(f"→ Notes {sorted(current_note_weights.keys())} over {px_width}px "
+                      f"(weights: { {k: round(v/total_active_pixels_prev if 'total_active_pixels_prev' in locals() else v, 2) for k,v in current_note_weights.items()} })")
 
             start_x = x
-            current_notes = column_notes
+            current_note_weights = new_note_weights
+            total_active_pixels_prev = total_active_pixels  # for debug print
 
-    # Add final segment if needed
-    if current_notes and start_x < width:
+    # Final segment
+    if current_note_weights and start_x < width:
         px_width = width - start_x
-        segments.append((current_notes.copy(), px_width))
-        print(f"→ Notes {sorted(current_notes)} over {px_width}px")
+        segments.append((current_note_weights.copy(), px_width))
 
     if not segments:
-        return jsonify({"error": "No recognizable colors detected"}), 400
+        return jsonify({"error": "No recognizable colored pixels detected"}), 400
 
-    # Total duration: scale to reasonable length (e.g., max ~12 seconds)
+    # Scale total duration
     TOTAL_MAX_DURATION = 12.0
     total_pixels = sum(px_width for _, px_width in segments)
     if total_pixels == 0:
@@ -889,58 +900,64 @@ def submit():
 
     audio_segments = []
 
-    for note_set, px_width in segments:
+    for note_weights, px_width in segments:
         duration = (px_width / total_pixels) * TOTAL_MAX_DURATION
         sample_count = int(SAMPLE_RATE * duration)
         mixed = np.zeros(sample_count, dtype=np.float32)
 
-        if not note_set:
+        if not note_weights:
             audio_segments.append(mixed)
             continue
 
-        valid_notes = 0
-        for note_name in note_set:
+        total_weight = sum(note_weights.values())
+        if total_weight == 0:
+            audio_segments.append(mixed)
+            continue
+
+        for note_name, pixel_count in note_weights.items():
             sample = load_piano_sample(note_name)
             if len(sample) == 0:
                 continue
 
-            # Resize sample to fit segment
+            # Resize sample to segment length
             if len(sample) > sample_count:
                 seg = sample[:sample_count]
             else:
                 seg = np.pad(sample, (0, sample_count - len(sample)))
 
+            # Volume based on thickness: proportion of column filled by this color
+            volume = pixel_count / total_weight  # 0.0 to 1.0 (or >1 if only one color)
+            volume = min(volume * 1.8, 1.0)  # boost a bit but avoid clipping
+
+            seg *= volume
+
             mixed += seg
-            valid_notes += 1
 
-        if valid_notes > 0:
-            # Normalize
-            max_amp = np.max(np.abs(mixed))
-            if max_amp > 0:
-                mixed /= max_amp * 1.2  # headroom
+        # Overall normalization + headroom
+        max_amp = np.max(np.abs(mixed))
+        if max_amp > 0:
+            mixed /= max_amp * 1.1
 
-            # Gentle fade out
-            fade_samples = min(2000, sample_count // 4)
-            if fade_samples > 0:
-                fade = np.linspace(1.0, 0.0, fade_samples)
-                mixed[-fade_samples:] *= fade
+        # Gentle fade-out
+        fade_samples = min(3000, sample_count // 5)
+        if fade_samples > 10:
+            fade = np.linspace(1.0, 0.0, fade_samples)
+            mixed[-fade_samples:] *= fade
 
         audio_segments.append(mixed)
 
-    # Concatenate all segments
+    # Concatenate
     final_audio = np.concatenate(audio_segments)
-
-    # Clip and convert to int16
     final_audio = np.clip(final_audio, -1.0, 1.0)
     audio_i16 = (final_audio * 32767).astype(np.int16)
 
-    # Save file
-    filename = f"piano_{int(time.time() * 1000)}.wav"
+    # Save
+    filename = f"piano_thick_{int(time.time() * 1000)}.wav"
     filepath = os.path.join(OUTPUT_DIR, filename)
     write(filepath, SAMPLE_RATE, audio_i16)
 
     total_seconds = len(final_audio) / SAMPLE_RATE
-    print(f"SUCCESS! {len(segments)} segment(s), {total_seconds:.2f}s → {filename}\n")
+    print(f"SUCCESS! Generated {len(segments)} segments, {total_seconds:.2f}s → {filename}")
 
     return jsonify({"url": f"/static/audio/{filename}"})
 
