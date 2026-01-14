@@ -1,48 +1,82 @@
-Privacy & Usage Policy – Interactive Multimedia Converter
-Effective Date: 25.10.2025
+Privacy Policy
+This Privacy Policy governs the manner in which SynestheticSounds ("the App") collects, uses, maintains, and discloses information collected from users ("You" or "User") of the App.
 
-Interactive Multimedia Converter is committed to protecting user privacy and ensuring safe, inclusive access to our AI-powered communication tools. This policy outlines how we collect, use, and protect user data, and defines acceptable use of the app.
+1. Data Collection
+The SynestheticSounds App is designed as a standalone creative tool. It does not collect any personal information, usage data, or any other form of data from its users. The application operates entirely offline, and all creative work, including colors, shapes, and sounds, is processed and stored locally on your device.
 
-1. Purpose of the App
-This app is designed to support individuals with cognitive and sensory challenges by simplifying communication through AI-powered audio, visual, and color-based conversion tools. It is intended for personal, educational, and therapeutic use.
+2. Third-Party Services
+The App does not use any third-party services that may collect, use, or share your data.
 
-2. Data Collection & Usage
-We prioritize user privacy and minimize data collection.
+3. Children’s Privacy
+The App is designed for a general audience and is not specifically targeted at children. Since no personal data is collected from any user, including children, we comply with all relevant regulations regarding children's privacy.
 
-Audio files uploaded for conversion are processed temporarily and are not stored or shared.
+4. Changes to this Privacy Policy
+We reserve the right to update this Privacy Policy at any time. Any changes will be posted on this page. You are encouraged to check this page periodically for any changes.
 
-No personal identifiers are required to use core features.
+5. Your Acceptance of These Terms
+By using the SynestheticSounds App, you signify your acceptance of this policy. If you do not agree to this policy, please do not use our App. Your continued use of the App following the posting of changes to this policy will be deemed your acceptance of those changes.
 
-Anonymous usage data may be collected to improve app performance and accessibility.
+Terms of Service
+1. Acceptance of Terms
+By accessing or using the SynestheticSounds application, you agree to be bound by these Terms of Service. If you do not agree to these terms, do not use the application.
 
-For more details, refer to Microsoft’s Privacy Statement.
+2. Use of the App
+The App is provided for your personal, non-commercial use. You may use the App to create drawings and soundscapes. All content created by you remains your property.
 
-3. User Responsibilities
-By using this app, users agree to:
+3. Disclaimer of Warranties
+The App is provided "as is" and "as available" without any warranties of any kind. We do not warrant that the App will be uninterrupted or error-free.
 
-Upload only content they have rights to use.
+4. Limitation of Liability
+In no event shall we be liable for any damages arising out of the use or inability to use the App.
 
-Avoid submitting offensive, harmful, or illegal material.
+5. Contact Us
+If you have any questions about this Privacy Policy or these Terms of Service, please feel free to contact us.
 
-Use the app in ways that promote respectful, inclusive communication.
 
-4. Accessibility Commitment
-We are dedicated to making this app accessible to users of all abilities. If you encounter usability barriers or have suggestions for improvement, please contact us at aalievaa7@gmail.com.
+# Privacy Policy
 
-5. Intellectual Property
-All content, designs, and technologies within the app are the intellectual property of Interactive Multimedia and its partners. Unauthorized reproduction, redistribution, or reverse engineering is strictly prohibited.
+This Privacy Policy governs the manner in which SynestheticSounds ("the App") collects, uses, maintains, and discloses information collected from users ("You" or "User") of the App.
 
-6. Pricing & Subscription
-Monthly Plan: $9 USD
+## 1. Data Collection
 
-Annual Plan: $99 USD Subscriptions provide full access to all features, including audio-to-visual conversion, color-coded text, and AI-assisted learning tools.
+The SynestheticSounds App is designed as a standalone creative tool. It does not collect any personal information, usage data, or any other form of data from its users. The application operates entirely offline, and all creative work, including colors, shapes, and sounds, is processed and stored locally on your device.
 
-7. Updates & Modifications
-This policy may be updated periodically to reflect new features, legal requirements, or user feedback. Continued use of the app implies acceptance of the latest terms.
+## 2. Third-Party Services
 
-Contact Information
-Interactive Multimedia Founder: 
-Aygun Aliyeva Sundhordvik 
-Email: aalievaa7@gmail.com 
-Phone: +994 99 888 0892 
-Website: https://multimediaconverter.azurewebsites.net
+The App does not use any third-party services that may collect, use, or share your data.
+
+## 3. Children’s Privacy
+
+The App is designed for a general audience and is not specifically targeted at children. Since no personal data is collected from any user, including children, we comply with all relevant regulations regarding children's privacy.
+
+## 4. Changes to this Privacy Policy
+
+We reserve the right to update this Privacy Policy at any time. Any changes will be posted on this page. You are encouraged to check this page periodically for any changes.
+
+## 5. Your Acceptance of These Terms
+
+By using the SynestheticSounds App, you signify your acceptance of this policy. If you do not agree to this policy, please do not use our App. Your continued use of the App following the posting of changes to this policy will be deemed your acceptance of those changes.
+
+---
+
+# Terms of Service
+
+## 1. Acceptance of Terms
+
+By accessing or using the SynestheticSounds application, you agree to be bound by these Terms of Service. If you do not agree to these terms, do not use the application.
+
+## 2. Use of the App
+
+The App is provided for your personal, non-commercial use. You may use the App to create drawings and soundscapes. All content created by you remains your property.
+
+## 3. Disclaimer of Warranties
+
+The App is provided "as is" and "as available" without any warranties of any kind. We do not warrant that the App will be uninterrupted or error-free.
+
+## 4. Limitation of Liability
+
+In no event shall we be liable for any damages arising out of the use or inability to use the App.
+
+## 5. Contact Us
+
+If you have any questions about this Privacy Policy or these Terms of Service, please feel free to contact us.

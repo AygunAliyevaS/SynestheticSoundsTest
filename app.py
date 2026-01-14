@@ -1,978 +1,1231 @@
-import matplotlib
-matplotlib.use('Agg')
-import colorsys
-import time
-from flask import Flask, render_template, request,session,send_from_directory,jsonify
-import numpy as np
-import librosa
-import librosa.display
-import matplotlib.pyplot as plt
-import matplotlib.colors as mcolors
-import io
 import os
+import time
 import base64
-from music_visualizer import process_audio_to_gif
-from scipy.io.wavfile import read as wav_read # Add this line near other imports
+import logging
 from io import BytesIO
-from PIL import Image
-from colorsys import rgb_to_hsv
-from scipy.io.wavfile import write as write_wav
-from PIL import Image, ImageDraw, ImageFont
-import string
-from docx import Document
-import PyPDF2
-import pdfplumber
-import soundfile as sf
-#from sounddevice as sd
-from scipy.io.wavfile import write
-import matplotlib.pyplot as plt
-from scipy.fft import fft
-import io
-import base64
-import pandas as pd
-# from pydub import AudioSegment
-from werkzeug.utils import secure_filename
-from dash import Dash, dcc, html
-from dash import dcc, html
-from dash import Dash, dcc, html, callback, Input, Output
-import plotly.graph_objs as go
-import plotly.express as px
-global session
 import numpy as np
-from numpy.random import uniform
+from scipy.io.wavfile import write as write_wav
 from scipy import signal
+from PIL import Image
+from flask import Flask, request, render_template, jsonify, send_from_directory, session, redirect, url_for
+from colorsys import rgb_to_hsv
+from dotenv import load_dotenv
+import msal
+import requests
+from flask_session import Session
+from datetime import datetime
+import pyodbc
+import uuid
+import string
+import random
+import json
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 
-PIANO_SAMPLES = {}
-SAMPLE_RATE = 44100
-app = Flask(__name__)
-app.secret_key = 'Lantop2333' # Set a secret key session
+load_dotenv()
+logger = logging.getLogger(__name__)
+
+
+def send_user_confirmation(user_email: str, short_id: str, category: str, message: str) -> bool:
+    """
+    Send confirmation email via Gmail SMTP.
+    The SportyBet-styled HTML template is unchanged.
+    """
+    # ---------- Gmail SMTP (hard-coded for testing) ----------
+    SMTP_SERVER = "smtp.gmail.com"
+    SMTP_PORT   = 587
+    SMTP_USER   = "adamsamal28@gmail.com"          # your Gmail address
+    SMTP_PASS   = "pyfmcdsquihyeemc"              # 16-char App Password
+    SENDER_NAME = "Synesthetica Support"
+
+    # Quick sanity check – if any of the hard-coded values are empty the function will fail early
+    if not all([SMTP_SERVER, SMTP_USER, SMTP_PASS]):
+        logger.error("Missing Gmail SMTP credentials")
+        return False
+
+    # ---------- Email Content (exactly the same as before) ----------
+    subject = f"Ticket #{short_id} - We've Got You Covered!"
+
+    plain_body = f"""We have received your report ticket number {short_id}. Our team will be with you shortly.
+Ticket Details:
+- ID: {short_id}
+- Category: {category}
+- Status: Open
+Open Chat: https://synes.azurewebsites.net/support/{short_id}
+Best regards,
+{SENDER_NAME}
+aygunaliyeva@anas.az
+"""
+
+    html_body = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+            body {{ font-family: 'Arial', sans-serif; margin: 0; padding: 0; background-color: #f4f4f4; color: #333; }}
+            .container {{ max-width: 600px; margin: 0 auto; background-color: #fff; }}
+            .header {{ background: linear-gradient(135deg, #00C851, #00a651); padding: 20px; text-align: center; color: white; }}
+            .header h1 {{ margin: 0; font-size: 28px; font-weight: bold; }}
+            .header p {{ margin: 5px 0 0; font-size: 14px; opacity: 0.9; }}
+            .content {{ padding: 30px 20px; }}
+            .ticket-card {{ background: #fff; border: 2px solid #00C851; border-radius: 10px; padding: 20px; margin: 20px 0; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }}
+            .ticket-card h2 {{ color: #00C851; margin-top: 0; font-size: 22px; display: flex; align-items: center; }}
+            .ticket-card h2::before {{ content: 'Ticket'; margin-right: 10px; }}
+            .ticket-details {{ list-style: none; padding: 0; }}
+            .ticket-details li {{ padding: 8px 0; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; }}
+            .ticket-details li:last-child {{ border-bottom: none; }}
+            .label {{ font-weight: bold; color: #FF5722; }}
+            .value {{ color: #333; }}
+            .cta {{ text-align: center; margin: 30px 0; }}
+            .cta-button {{ background: #00C851; color: white; padding: 15px 30px; text-decoration: none; border-radius: 50px; font-weight: bold; font-size: 16px; display: inline-block; box-shadow: 0 4px 8px rgba(0,200,81,0.3); transition: background 0.3s; }}
+            .cta-button:hover {{ background: #00a651; }}
+            .footer {{ background: #333; color: white; padding: 20px; text-align: center; font-size: 12px; }}
+            .footer a {{ color: #00C851; text-decoration: none; }}
+            @media (max-width: 600px) {{ .content {{ padding: 20px 15px; }} .header h1 {{ font-size: 24px; }} }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>Synesthetica Support</h1>
+                <p>Turning Your Support Into Victory!</p>
+            </div>
+            <div class="content">
+                <div class="ticket-card">
+                    <h2>Ticket Confirmation</h2>
+                    <p style="font-size: 16px; line-height: 1.5; margin-bottom: 20px;">
+                        We have received your report ticket number <strong>{short_id}</strong>. Our team will be with you shortly.
+                    </p>
+                    <ul class="ticket-details">
+                        <li><span class="label">Ticket ID:</span> <span class="value"><strong>{short_id}</strong></span></li>
+                        <li><span class="label">Category:</span> <span class="value">{category}</span></li>
+                        <li><span class="label">Status:</span> <span class="value" style="color: #00C851; font-weight: bold;">Open &amp; Active</span></li>
+                    </ul>
+                </div>
+                <div class="cta">
+                    <a href="https://synes.azurewebsites.net/support/{short_id}" class="cta-button">Open Chat Now</a>
+                </div>
+            </div>
+            <div class="footer">
+                <p>Best regards,<br><strong>{SENDER_NAME}</strong></p>
+                <p><a href="mailto:aygunaliyeva@anas.az">aygunaliyeva@anas.az</a> | Questions? Reply to this email.</p>
+                <p style="font-size: 10px; opacity: 0.8;">&copy; 2025 Synesthetica. All rights reserved. Support messages are confidential.</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+
+    # ---------- Compose & Send ----------
+    msg = MIMEMultipart("alternative")
+    msg["From"] = f"{SENDER_NAME} <{SMTP_USER}>"
+    msg["To"]   = user_email
+    msg["Subject"] = subject
+
+    msg.attach(MIMEText(plain_body, "plain"))
+    msg.attach(MIMEText(html_body, "html"))
+
+    try:
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+            server.starttls()
+            server.login(SMTP_USER, SMTP_PASS)
+            server.send_message(msg)
+        logger.info(f"Confirmation email sent to {user_email} (ticket {short_id})")
+        return True
+    except smtplib.SMTPAuthenticationError as e:
+        logger.error(f"Gmail auth failed: {e}")
+        logger.error("Double-check the Gmail address & 16-char App Password")
+        return False
+    except smtplib.SMTPRecipientsRefused:
+        logger.error(f"Recipient refused: {user_email}")
+        return False
+    except Exception as e:
+        logger.error(f"Email failed: {type(e).__name__}: {e}")
+        return False
+
+
+def _ensure_welcome_message(chat: list) -> list:
+    """
+    Guarantees that the first entry in `chat` is the support‑team welcome.
+    If the list is empty or the first entry is not the welcome, prepend it.
+    """
+    WELCOME = {
+        "sender": "support",
+        "text": "Welcome to support! How can we help you today?",
+        "timestamp": None  # will be filled by the client or left null
+    }
+    if not chat or chat[0].get("sender") != "support":
+        chat.insert(0, WELCOME)
+    return chat
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    handlers=[
+        logging.FileHandler('app.log'),
+        logging.StreamHandler()
+    ]
+)
+
+app = Flask(__name__, static_folder='static')
+
+# Session Configuration
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', os.urandom(24).hex())
+app.config['SESSION_TYPE'] = 'filesystem'
+app.config['SESSION_PERMANENT'] = False
+app.config['SESSION_USE_SIGNER'] = True
+app.config['SESSION_FILE_DIR'] = os.getenv('SESSION_FILE_DIR', '/home/site/wwwroot/sessions')  # Azure-friendly path
+app.config['SESSION_COOKIE_SECURE'] = True  # Ensure cookies are sent over HTTPS
+app.config['SESSION_COOKIE_HTTPONLY'] = True  # Prevent JavaScript access to cookies
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # Mitigate CSRF
+
+# SQL Server Database Configuration
+app.config['DB_SERVER'] = os.getenv('DB_SERVER')
+app.config['DB_NAME'] = os.getenv('DB_NAME')
+app.config['DB_USER'] = os.getenv('DB_USER')
+app.config['DB_PASSWORD'] = os.getenv('DB_PASSWORD')
+app.config['DB_DRIVER'] = os.getenv('DB_DRIVER', 'ODBC Driver 17 for SQL Server')
+
+
+# Subscription and Billing Configuration
+FREE_SUBMISSION_LIMIT = 10
+ADDITIONAL_SUBMISSION_COST = 0.01  # $0.01 per additional submission
+SUBSCRIBE_URL = os.getenv('SUBSCRIBE_URL', 'https://portal.azure.com/#create/1700007431.synesthetica')
+
+Session(app)
+
+# Microsoft Auth Configuration
+CLIENT_ID = os.getenv('CLIENT_ID')
+CLIENT_SECRET = os.getenv('CLIENT_SECRET')
+AUTHORITY = os.getenv('AUTHORITY')
+REDIRECT_URI = os.getenv('REDIRECT_URI')
+SCOPE = ["User.Read"]  # Simplified scope for user profile access
+
+# Log environment variables for debugging
+logger.info(f"Environment variables - CLIENT_ID: {CLIENT_ID}, AUTHORITY: {AUTHORITY}, REDIRECT_URI: {REDIRECT_URI}")
+
+# Build MSAL client
+msal_client = msal.ConfidentialClientApplication(
+    CLIENT_ID,
+    authority=AUTHORITY,
+    client_credential=CLIENT_SECRET
+)
+
+# Audio generation configuration
 OUTPUT_DIR = "static/audio"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
-# Assuming DURATION_PER_STEP and SAMPLE_RATE are defined globally or passed in
-# For demonstration, let's define them here:
-# DURATION_PER_STEP = 1 # seconds
-SAMPLE_RATE = 44100 # Hz
-DURATION_PER_STEP = (60)/1000 # seconds per X step (column)
+SAMPLE_RATE = 44100
+DURATION_PER_STEP = 60 / 1000
+
+# Note-to-semitone mapping
 NOTE_TO_SEMITONE = {
     'C': 0, 'C#': 1, 'D': 2, 'D#': 3,
     'E': 4, 'F': 5, 'F#': 6, 'G': 7,
     'G#': 8, 'A': 9, 'A#': 10, 'B': 11
 }
 note_names = list(NOTE_TO_SEMITONE.keys())
-dash_app = Dash(__name__, server=app, url_base_pathname='/dash/')
-Fs = 44100 # Sampling frequency
-# Frequency ranges and names of piano notes
-freqs_org = [27.50, 29.14, 30.87, 32.70, 34.65, 36.71, 38.89, 41.20, 43.65, 46.25, 49.00, 51.91, 55.00, 58.27,
-         61.74, 65.41, 69.30, 73.42, 77.78, 82.41, 87.31, 92.50, 98.00, 103.83, 110.00, 116.54, 123.47,
-         130.81, 138.59, 146.83, 155.56, 164.81, 174.61, 185.00, 196.00, 207.65, 220.00, 233.08, 246.94,
-         261.63, 277.18, 293.66, 311.13, 329.63, 349.23, 369.99, 392.00, 415.30, 440.00, 466.16, 493.88,
-         523.25, 554.37, 587.33, 622.25, 659.25, 698.46, 739.99, 783.99, 830.61, 880.00, 932.33, 987.77,
-         1046.50, 1108.73, 1174.66, 1244.51, 1318.51, 1396.91, 1479.98, 1567.98, 1661.22, 1760.00,
-         1864.66, 1975.53, 2093.00, 2217.46, 2349.32, 2489.02, 2637.02, 2793.83, 2959.96, 3135.96,
-         3322.44, 3520.00, 3729.31, 3951.07, 4186.01]
-# Set colors for each frequency
-colors = [[139/255, 0, 0]] * len(freqs_org)
-sounds = {
-'A': (0, 100, 0), # Dark Green+I1:I31
-'B': (255, 127, 80), # Coral
-'C': (210, 180, 140), # Light Brown
-'Ç': (205, 170, 100), # Light golden brown
-'D': (255, 165, 0), # Orange
-'E': (0, 255, 255), # Light Blue
-'Ə': (230, 230, 250), # Lavender
-'F': (139, 0, 139), # Dark Magenta
-'G': (255, 215, 0), # Gold
-'Ğ': (184, 134, 11), # Golden brown
-'H': (128, 128, 0), # Olive
-'X': (50, 60, 30), # Dark brown green
-'I': (100, 200, 200), # light sea wave
-'İ': (46, 139, 87), # Sea Wave
-'J': (221, 160, 221), # Plum
-'K': (255, 0, 255), # Magenta
-'Q': (153, 50, 204), # Dark blue magenta
-'L': (0, 0, 255), # Blue
-'M': (255, 0, 0), # Red
-'N': (255, 255, 0), # Yellow
-'O': (50, 205, 50), # Lime
-'Ö': (50, 70, 0), # Dark lime
-'P': (255, 255, 224), # Light Yellow
-'R':(255, 250, 205), # Lemon
-'S': (255, 182, 193), # Light Pink
-'Ş': (210, 105, 30), # Chocolate
-'T': (189, 252, 201), # Mint
-'U': (64, 224, 208), # Turquoise
-'Ü': (0, 255, 0), # Green ŋ
-'V': (250, 128, 114), # Salmon
-'Y': (35, 70, 70), # Dark green blue
-'a': (0, 100, 0), # Dark Green
-'b': (255, 127, 80), # Coral
-'c': (210, 180, 140), # Light Brown
-'d': (255, 165, 0), # Orange
-'e': (0, 255, 255), # Light Blue
-'f': (139, 0, 139), # Dark Magenta
-'g': (255, 215, 0), # Gold
-'h': (128, 128, 0), # Olive
-'i': (46, 139, 87), # Sea Wave
-'j': (250, 128, 114), # Salmon
-'k': (255, 0, 255), # Magenta
-'l': (0, 0, 255), # Blue
-'m': (255, 0, 0), # Red
-'n': (255, 255, 0), # Yellow
-'o': (50, 205, 50), # Lime
-'p': (139, 0, 0), # Dark Red
-'q': (153, 50, 204), # Dark blue magenta
-'r': (255, 250, 205), # Lemon
-'s': (255, 182, 193), # Light Pink
-'t': (0, 0, 139), # Dark Blue
-'u': (64, 224, 208), # Turquoise
-'v': (255, 192, 203), # Pink
-'w': (255, 255, 224), # Light Yellow
-'x': (50, 60, 30), # Dark brown green
-'y': (35, 70, 70), # Dark green blue
-'z': (165, 42, 42), # Brown
-'th': (189, 252, 201), # Mint
-'sh': (210, 105, 30), # Chocolate
-'ing': (0, 255, 0), #Green ŋ
-'isi': (250, 128, 114), # Salmon
-'ʌ': (65, 105, 225), # Royal Blue
-'æ': (230, 230, 250), # Lavender
- 'æ': (230, 230, 250),
-'Ə' :(230, 230, 250),
-'Ğ':(184, 134, 11), # Golden brown
-'ğ': (184, 134, 11), # Golden brown
-'ə': (230, 230, 250),
-'Ş':(210, 105, 30), # Chocolate
-'ş': (210, 105, 30), # Chocolate
-    "ʒ": (250, 128, 114), # Salmon
-    "ʃ": (210, 105, 30), # Chocolate
-    "z": (165, 42, 42), # Brown
-    "θ": (255, 140, 0), # Dark Orange
-   'Ü':(0, 255, 0), # Green ŋ
-   'ü': (0, 255, 0), # Green ŋ
-'Ö':(50, 70, 0), # Dark lime
-'ö': (50, 70, 0), # Dark lime
-'Ç': (205, 170, 100), # Light golden brown
-'ç': (205, 170, 100) # Light golden brown
-   
+
+# Frequency-to-color mapping
+freq_symbols = {
+    "A0": {"frequency": 27.50, "color": [139, 0, 0], "range": [27.50, 29.14], "symbol": "♩"},
+    "A#0/Bb0": {"frequency": 29.14, "color": [255, 69, 0], "range": [29.14, 30.87], "symbol": "♯"},
+    "B0": {"frequency": 30.87, "color": [204, 204, 0], "range": [30.87, 32.70], "symbol": "♩"},
+    "C1": {"frequency": 32.70, "color": [102, 152, 0], "range": [32.70, 34.65], "symbol": "♩"},
+    "C#1/Db1": {"frequency": 34.65, "color": [0, 100, 0], "range": [34.65, 36.71], "symbol": "♯"},
+    "D1": {"frequency": 36.71, "color": [0, 50, 69], "range": [36.71, 38.89], "symbol": "♩"},
+    "D#1/Eb1": {"frequency": 38.89, "color": [0, 0, 139], "range": [38.89, 41.20], "symbol": "♯"},
+    "E1": {"frequency": 41.20, "color": [75, 0, 130], "range": [41.20, 43.65], "symbol": "♩"},
+    "F1": {"frequency": 43.65, "color": [112, 0, 171], "range": [43.65, 46.25], "symbol": "♩"},
+    "F#1/Gb1": {"frequency": 46.25, "color": [148, 0, 211], "range": [46.25, 49.00], "symbol": "♯"},
+    "G1": {"frequency": 49.00, "color": [157, 0, 106], "range": [49.00, 51.91], "symbol": "♩"},
+    "G#1/Ab1": {"frequency": 51.91, "color": [165, 0, 0], "range": [51.91, 55.00], "symbol": "♯"},
+    "A1": {"frequency": 55.00, "color": [210, 0, 128], "range": [55.00, 58.27], "symbol": "♩"},
+    "A#1/Bb1": {"frequency": 58.27, "color": [255, 94, 0], "range": [58.27, 61.74], "symbol": "♯"},
+    "B1": {"frequency": 61.74, "color": [221, 221, 0], "range": [61.74, 65.41], "symbol": "♩"},
+    "C2": {"frequency": 65.41, "color": [111, 175, 0], "range": [65.41, 69.30], "symbol": "♩"},
+    "C#2/Db2": {"frequency": 69.30, "color": [0, 128, 0], "range": [69.30, 73.42], "symbol": "♯"},
+    "D2": {"frequency": 73.42, "color": [0, 64, 85], "range": [73.42, 77.78], "symbol": "♩"},
+    "D#2/Eb2": {"frequency": 77.78, "color": [0, 0, 170], "range": [77.78, 82.41], "symbol": "♯"},
+    "E2": {"frequency": 82.41, "color": [92, 0, 159], "range": [82.41, 87.31], "symbol": "♩"},
+    "F2": {"frequency": 87.31, "color": [119, 0, 96], "range": [87.31, 92.50], "symbol": "♩"},
+    "F#2/Gb2": {"frequency": 92.50, "color": [159, 0, 226], "range": [92.50, 98.00], "symbol": "♯"},
+    "G2": {"frequency": 98.00, "color": [175, 0, 113], "range": [98.00, 103.83], "symbol": "♩"},
+    "G#2/Ab2": {"frequency": 103.83, "color": [191, 0, 0], "range": [103.83, 110.00], "symbol": "♯"},
+    "A2": {"frequency": 110.00, "color": [223, 59, 128], "range": [110.00, 116.54], "symbol": "♩"},
+    "A#2/Bb2": {"frequency": 116.54, "color": [255, 119, 0], "range": [116.54, 123.47], "symbol": "♯"},
+    "B2": {"frequency": 123.47, "color": [238, 238, 0], "range": [123.47, 130.81], "symbol": "♩"},
+    "C3": {"frequency": 130.81, "color": [119, 159, 0], "range": [130.81, 138.59], "symbol": "♩"},
+    "C#3/Db3": {"frequency": 138.59, "color": [0, 160, 0], "range": [138.59, 146.83], "symbol": "♯"},
+    "D3": {"frequency": 146.83, "color": [0, 80, 100], "range": [146.83, 155.56], "symbol": "♩"},
+    "D#3/Eb3": {"frequency": 155.56, "color": [0, 0, 200], "range": [155.56, 164.81], "symbol": "♯"},
+    "E3": {"frequency": 164.81, "color": [109, 0, 188], "range": [164.81, 174.61], "symbol": "♩"},
+    "F3": {"frequency": 174.61, "color": [140, 0, 215], "range": [174.61, 185.00], "symbol": "♩"},
+    "F#3/Gb3": {"frequency": 185.00, "color": [170, 0, 241], "range": [185.00, 196.00], "symbol": "♯"},
+    "G3": {"frequency": 196.00, "color": [194, 0, 121], "range": [196.00, 207.65], "symbol": "♩"},
+    "G#3/Ab3": {"frequency": 207.65, "color": [217, 0, 0], "range": [207.65, 220.00], "symbol": "♯"},
+    "A3": {"frequency": 220.00, "color": [236, 72, 0], "range": [220.00, 233.08], "symbol": "♩"},
+    "A#3/Bb3": {"frequency": 233.08, "color": [255, 144, 0], "range": [233.08, 246.94], "symbol": "♯"},
+    "B3": {"frequency": 246.94, "color": [255, 255, 0], "range": [246.94, 261.63], "symbol": "♩"},
+    "C4": {"frequency": 261.63, "color": [128, 224, 0], "range": [261.63, 277.18], "symbol": "♩"},
+    "C#4/Db4": {"frequency": 277.18, "color": [0, 192, 0], "range": [277.18, 293.66], "symbol": "♯"},
+    "D4": {"frequency": 293.66, "color": [0, 96, 115], "range": [293.66, 311.13], "symbol": "♩"},
+    "D#4/Eb4": {"frequency": 311.13, "color": [0, 0, 230], "range": [311.13, 329.63], "symbol": "♯"},
+    "E4": {"frequency": 329.63, "color": [126, 0, 217], "range": [329.63, 349.23], "symbol": "♩"},
+    "F4": {"frequency": 349.23, "color": [159, 26, 236], "range": [349.23, 369.99], "symbol": "♩"},
+    "F#4/Gb4": {"frequency": 369.99, "color": [191, 51, 255], "range": [369.99, 392.00], "symbol": "♯"},
+    "G4": {"frequency": 392.00, "color": [217, 26, 128], "range": [392.00, 415.30], "symbol": "♩"},
+    "G#4/Ab4": {"frequency": 415.30, "color": [243, 0, 0], "range": [415.30, 440.00], "symbol": "♯"},
+    "A4": {"frequency": 440.00, "color": [249, 85, 0], "range": [440.00, 466.16], "symbol": "♩"},
+    "A#4/Bb4": {"frequency": 466.16, "color": [255, 169, 0], "range": [466.16, 493.88], "symbol": "♯"},
+    "B4": {"frequency": 493.88, "color": [255, 255, 51], "range": [493.88, 523.25], "symbol": "♩"},
+    "C5": {"frequency": 523.25, "color": [153, 255, 51], "range": [523.25, 554.37], "symbol": "♩"},
+    "C#5/Db5": {"frequency": 554.37, "color": [51, 255, 51], "range": [554.37, 587.33], "symbol": "♯"},
+    "D5": {"frequency": 587.33, "color": [51, 204, 204], "range": [587.33, 622.25], "symbol": "♪"},
+    "D#5/Eb5": {"frequency": 622.25, "color": [51, 51, 255], "range": [622.25, 659.25], "symbol": "♭"},
+    "E5": {"frequency": 659.25, "color": [128, 51, 255], "range": [659.25, 698.46], "symbol": "𝅘𝅥𝅮"},
+    "F5": {"frequency": 698.46, "color": [159, 87, 255], "range": [698.46, 739.99], "symbol": "♩"},
+    "F#5/Gb5": {"frequency": 739.99, "color": [190, 123, 255], "range": [739.99, 783.99], "symbol": "♯"},
+    "G5": {"frequency": 783.99, "color": [204, 87, 128], "range": [783.99, 830.61], "symbol": "♫"},
+    "G#5/Ab5": {"frequency": 830.61, "color": [255, 51, 51], "range": [830.61, 880.00], "symbol": "♭"},
+    "A5": {"frequency": 880.00, "color": [255, 128, 102], "range": [880.00, 932.33], "symbol": "𝅗𝅥"},
+    "A#5/Bb5": {"frequency": 932.33, "color": [255, 204, 102], "range": [932.33, 987.77], "symbol": "♯"},
+    "B5": {"frequency": 987.77, "color": [255, 255, 102], "range": [987.77, 1046.50], "symbol": "𝅘𝅥"},
+    "C6": {"frequency": 1046.50, "color": [179, 255, 102], "range": [1046.50, 1108.73], "symbol": "♩"},
+    "C#6/Db6": {"frequency": 1108.73, "color": [102, 255, 102], "range": [1108.73, 1174.66], "symbol": "♯"},
+    "D6": {"frequency": 1174.66, "color": [102, 204, 204], "range": [1174.66, 1244.51], "symbol": "♪"},
+    "D#6/Eb6": {"frequency": 1244.51, "color": [102, 102, 255], "range": [1244.51, 1318.51], "symbol": "♭"},
+    "E6": {"frequency": 1318.51, "color": [153, 102, 255], "range": [1318.51, 1396.91], "symbol": "𝅘𝅥𝅮"},
+    "F6": {"frequency": 1396.91, "color": [171, 128, 255], "range": [1396.91, 1479.98], "symbol": "♩"},
+    "F#6/Gb6": {"frequency": 1479.98, "color": [201, 153, 255], "range": [1479.98, 1567.98], "symbol": "♯"},
+    "G6": {"frequency": 1567.98, "color": [209, 128, 153], "range": [1567.98, 1661.22], "symbol": "♫"},
+    "G#6/Ab6": {"frequency": 1661.22, "color": [255, 102, 102], "range": [1661.22, 1760.00], "symbol": "♭"},
+    "A6": {"frequency": 1760.00, "color": [255, 153, 128], "range": [1760.00, 1864.66], "symbol": "𝅗𝅥"},
+    "A#6/Bb6": {"frequency": 1864.66, "color": [255, 204, 153], "range": [1864.66, 1975.53], "symbol": "♯"},
+    "B6": {"frequency": 1975.53, "color": [255, 255, 153], "range": [1975.53, 2093.00], "symbol": "𝅘𝅥"},
+    "C7": {"frequency": 2093.00, "color": [204, 255, 153], "range": [2093.00, 2217.46], "symbol": "♩"},
+    "C#7/Db7": {"frequency": 2217.46, "color": [153, 255, 153], "range": [2217.46, 2349.32], "symbol": "♯"},
+    "D7": {"frequency": 2349.32, "color": [153, 204, 204], "range": [2349.32, 2489.02], "symbol": "♪"},
+    "D#7/Eb7": {"frequency": 2489.02, "color": [153, 153, 255], "range": [2489.02, 2637.02], "symbol": "♭"},
+    "E7": {"frequency": 2637.02, "color": [197, 153, 255], "range": [2637.02, 2793.83], "symbol": "𝅘𝅥𝅮"},
+    "F7": {"frequency": 2793.83, "color": [222, 176, 255], "range": [2793.83, 2959.96], "symbol": "♩"},
+    "F#7/Gb7": {"frequency": 2959.96, "color": [246, 198, 255], "range": [2959.96, 3135.96], "symbol": "♯"},
+    "G7": {"frequency": 3135.96, "color": [255, 176, 204], "range": [3135.96, 3322.44], "symbol": "♫"},
+    "G#7/Ab7": {"frequency": 3322.44, "color": [255, 153, 153], "range": [3322.44, 3520.00], "symbol": "♭"},
+    "A7": {"frequency": 3520.00, "color": [255, 194, 176], "range": [3520.00, 3729.31], "symbol": "𝅗𝅥"},
+    "A#7/Bb7": {"frequency": 3729.31, "color": [255, 234, 198], "range": [3729.31, 3951.07], "symbol": "♯"},
+    "B7": {"frequency": 3951.07, "color": [255, 255, 204], "range": [3951.07, 4186.01], "symbol": "𝅘𝅥"},
+    "C8": {"frequency": 4186.01, "color": [144, 238, 144], "range": [4186.01, 4434.92], "symbol": "♩"},
 }
-def read_docx(file):
-    doc = Document(file)
-    full_text = []
-    for para in doc.paragraphs:
-        full_text.append(para.text)
-    return '\n'.join(full_text)
-def read_pdf(file):
-    full_text = []
-    with pdfplumber.open(file) as pdf:
-        for page in pdf.pages:
-            full_text.append(page.extract_text())
-    return '\n'.join(full_text)
-def split_image_into_chunks(image, chunk_size):
-    width, height = image.size
-    chunks = []
-    for i in range(0, width, chunk_size):
-        chunk = image.crop((i, 0, min(i + chunk_size, width), height))
-        buf = io.BytesIO()
-        chunk.save(buf, format='PNG')
-        buf.seek(0)
-        chunks.append(base64.b64encode(buf.getvalue()).decode())
-    return chunks
-def generate_color_palette():
-    chars = string.digits + string.ascii_lowercase + string.ascii_uppercase + '!?., '
-    palette = {}
-    '''
-    num_colors = len(chars)
-    for i, char in enumerate(chars):
-        hue = i**2 / num_colors
-        lightness = 0.3 + (i % 2) * 0.4
-        saturation = 0.8 + (i % 3) * 0.6
-        rgb = colorsys.hls_to_rgb(hue, lightness, saturation)
-        rgb = tuple(int(255 * x) for x in rgb)
-        palette[char] = rgb
-    '''
-    palette['A'] = (200,200,200)
-    palette['b'] = (165,0,165)
-    palette['c'] = (100,200,255)
-   
-    for s in sounds:
-        p=sounds[s]
-        palette[s]=p
-   
-    print('pppp',palette)
-    return palette
-def char_to_color(char, palette):
-    return palette.get(char, (100,100,100))
-def color_to_char(color, palette):
-    for char, col in palette.items():
-        if col == color:
-            return char
-    return '?'
-def string_to_color_pattern(input_string, palette, cell_width=200, cell_height=150):
-    length = len(input_string)
-    width=0
-    for t in input_string:
-        if t.islower():
-            width+=cell_width
-        else:
-            width+=int(cell_width*1.5)
-       
-    #width = length * cell_width
-    height = cell_height + cell_height // 2
-    image = Image.new("RGB", (width, height), (255, 255, 255))
-    draw = ImageDraw.Draw(image)
-    font = ImageFont.load_default(size=50)
-    color_code = []
-    for i, char in enumerate(input_string):
-        if char.islower():
-            color = char_to_color(char, palette)
-            color_code.append(color)
-            top_left = (i * cell_width, 0)
-            bottom_right = ((i + 1) * cell_width, cell_height)
-            draw.rectangle([top_left, bottom_right], fill=color)
-            text_width, text_height = 20,20
-            text_x = top_left[0] + (cell_width - text_width) / 2
-            text_y = cell_height + (cell_height // 2 - text_height) / 2
-            font = ImageFont.load_default(size=50)
-            draw.text((text_x, text_y), char, fill=(0, 0, 0), font=font, stroke_width=1)
-        else:
-            color = char_to_color(char, palette)
-            color_code.append(color)
-            top_left = (i * cell_width, 0)
-            bottom_right = ((i + 1) * cell_width*1.5, cell_height)
-            draw.rectangle([top_left, bottom_right], fill=color)
-            text_width, text_height = 50,30
-            text_x = top_left[0] + (cell_width*1.1 - text_width) / 2
-            text_y = cell_height + (cell_height // 2 - text_height) / 2 - 20
-            font = ImageFont.load_default(size=65)
-            draw.text((text_x, text_y), char, fill=(0, 0, 0), font=font, stroke_width=3)
-           
-   
-    return image, color_code
 
+# Color-to-frequency mapping functions
+def hue_to_note_name(hue):
+    index = int((hue % 360) / 30)
+    return note_names[index]
 
-def load_piano_sample(note_name):
-    if note_name in PIANO_SAMPLES:
-        return PIANO_SAMPLES[note_name]
+def brightness_to_octave(brightness):
+    return int(3 + brightness * 3)
 
-    # === UPDATE THIS LIST TO MATCH YOUR ACTUAL FILE NAMES ===
-    candidates = [
-        f"{note_name}.wav",
-        f"{note_name.replace('#', 's')}.wav",           # e.g., C s 4.wav → Cs4.wav
-        f"{note_name.replace('#', 'sharp')}.wav",
-    ]
+def color_to_frequency(r, g, b):
+    h, s, v = rgb_to_hsv(r / 255, g / 255, b / 255)
+    hue_deg = h * 360
+    note_name = hue_to_note_name(hue_deg)
+    octave = brightness_to_octave(v)
+    midi_note = 12 + octave * 12 + NOTE_TO_SEMITONE[note_name]
+    return 440 * 2 ** ((midi_note - 69) / 12)
 
-    # Handle sharp/flat equivalents
-    equivalents = {
-        "C#": "Db", "D#": "Eb", "F#": "Gb", "G#": "Ab", "A#": "Bb"
-    }
-    flat_name = note_name
-    for sharp, flat in equivalents.items():
-        if sharp in note_name:
-            flat_name = note_name.replace(sharp, flat)
-            candidates.append(f"{flat_name}.wav")
-            break
+def get_quickly_frequency_by_color(r, g, b):
+    target = [r, g, b]
+    for note, props in freq_symbols.items():
+        if props["color"] == target:
+            return props["frequency"]
+    return None
 
-    # Special cases you mentioned in code
-    if "Gb" in note_name or "F#" in note_name:
-        candidates.append(f"F_{note_name[-1]}Gb{note_name[-1]}.wav")  # e.g., F_3Gb3.wav
+def get_frequency_from_color(r, g, b, threshold=10000):
+    closest_freq = None
+    closest_dist = float('inf')
+    for info in freq_symbols.items():
+        rgb = info[1].get("color")
+        if tuple(rgb) == (r, g, b):
+            return info[1]["frequency"]
+        if rgb:
+            dist = color_distance((r, g, b), tuple(rgb))
+            if dist < closest_dist:
+                closest_dist = dist
+                closest_freq = info[1]["frequency"]
+    return closest_freq
 
-    if note_name.startswith("A#") or note_name.startswith("Bb"):
-        candidates.append(f"A {note_name[1:]}Bb{note_name[1:]}.wav")  # e.g., A 0Bb0.wav
-
-    candidates = [c for c in candidates if c]
-    # ========================================================
-
-    for name in candidates:
-        path = os.path.join("static", "audio", name)
-        if os.path.exists(path):
-            print(f"[SAMPLE LOADED] {path}")
-            try:
-                data, sr = sf.read(path)
-                if len(data.shape) > 1:
-                    data = data.mean(axis=1)  # to mono
-                data = data.astype(np.float32)
-
-                # Normalize if needed
-                max_val = np.abs(data).max()
-                if max_val > 0:
-                    data /= max_val
-                if max_val > 1.0:
-                    data /= np.iinfo(np.int16).max
-
-                # Resample to 44100 if needed
-                if sr != SAMPLE_RATE:
-                    data = librosa.resample(data, orig_sr=sr, target_sr=SAMPLE_RATE)
-
-                # Trim long samples with fade-out
-                max_samples = int(SAMPLE_RATE * 2.0)  # allow up to 2 seconds
-                if len(data) > max_samples:
-                    fade_samples = int(SAMPLE_RATE * 0.3)
-                    envelope = np.ones(len(data))
-                    envelope[-fade_samples:] = np.linspace(1, 0, fade_samples)
-                    data *= envelope
-                    data = data[:max_samples]
-
-                PIANO_SAMPLES[note_name] = data
-                return data
-
-            except Exception as e:
-                print(f"Failed to load {path}: {e}")
-                continue
-
-    print(f"[WARNING] No sample found for note '{note_name}'. Using silence.")
-    return np.zeros(int(SAMPLE_RATE * 0.5), dtype=np.float32)
-
-def generate_segment_with_notes(notes, duration=DURATION_PER_STEP):
-    """Mix real piano samples for a column (x-position)."""
-    seg_len = int(SAMPLE_RATE * duration)
-    out = np.zeros(seg_len)
-
-    if not notes:
-        return out
-
-    uniq = set(notes)
-    print(f"[DEBUG] Column notes: {uniq}")
-
-    for note in uniq:
-        sample = load_piano_sample(note)
-        if len(sample) == 0:
-            continue
-
-        # trim / pad to exact segment length
-        if len(sample) > seg_len:
-            sample = sample[:seg_len]
-        else:
-            pad = np.zeros(seg_len)
-            pad[:len(sample)] = sample
-            sample = pad
-
-        # simple ADSR envelope (attack 0.1 s, quadratic decay)
-        env = np.linspace(1.0, 0.0, seg_len) ** 2
-        sample *= env
-
-        # equal-power mix
-        out += sample / len(uniq)
-
-    # normalise
-    mx = np.max(np.abs(out))
-    if mx > 0:
-        out = out / (mx * 1.1)
-    return out
-
-def color_code_to_string(color_code, palette):
-    return ''.join(color_to_char(tuple(color), palette) for color in color_code)
-@app.route('/')
-def index():
-    return render_template('index.html')
-@app.route('/upload', methods=['POST'])
-def upload_audio():
-    global session
-   
-    if 'file' not in request.files:
-        return render_template('index.html', error="No file part")
-    file = request.files['file']
-    if file.filename == '':
-        return render_template('index.html', error="No selected file")
-    if file:
-        y, sr = librosa.load(file)
-       
-        #y = y.reshape(-1, 1)
-        if y.ndim > 1 and y.shape[1] > 1:
-            print("Audio has more than one channel. Using the first channel.")
-            y = y[:, 0] # Select the first channel
-   
-        if len(y)>Fs*2.0*60:
-            y=y[:int(Fs*2.0*60)]
-        '''
-        D = np.abs(librosa.stft(y))
-        D_db = librosa.amplitude_to_db(D, ref=np.max)
-       
-        num_colors = 256
-        colors = [(0, 'black')]
-        for i in range(1, num_colors):
-            frequency = i / num_colors * (sr / 2)
-            hue = frequency / (sr / 2)
-            colors.append((i / (num_colors - 1), plt.cm.hsv(hue)[:3]))
-       
-        cmap = mcolors.LinearSegmentedColormap.from_list("custom_colormap", colors)
-       
-        fig, ax = plt.subplots(figsize=(10, 4))
-        img = librosa.display.specshow(D_db, sr=sr, x_axis='time', y_axis='log', cmap=cmap, ax=ax)
-        cbar = fig.colorbar(img, ax=ax, format='%+2.0f dB')
-        cbar.set_label('Decibels')
-       
-        buf = io.BytesIO()
-        plt.savefig(buf, format='png', bbox_inches='tight', pad_inches=0)
-        buf.seek(0)
-        plot_url = base64.b64encode(buf.getvalue()).decode()
-        '''
-        # Save the uploaded file temporarily
-        #temp_filename = 'uploaded_audio.wav' if file.filename.endswith('.wav') else 'uploaded_audio.mp3'
-        #file.save(temp_filename)
-       
-        frequencies,amplitudes= process_audio(y)
-       
-        # Store frequency data for Dash
-        frequency_data = {
-            'frequencies': frequencies,
-            'amplitudes': amplitudes
-        }
-        #session['frequency_data'] = frequency_data
-        df=pd.DataFrame(frequency_data)
-        os.remove('freq.csv')
-        df.to_csv('freq.csv',index=0)
-       
-        # here plot_url=plot_url
-        return render_template('color_representation.html')
-@app.route('/text-to-color', methods=['GET', 'POST'])
-def text_to_color():
-    if request.method == 'POST':
-        input_string = ""
-        if 'text' in request.form and request.form['text']:
-            input_string = request.form['text']
-        elif 'file' in request.files and request.files['file'].filename:
-            file = request.files['file']
-            filename = file.filename.lower()
-            if filename.endswith('.txt'):
-                input_string = file.read().decode('utf-8')
-            elif filename.endswith('.docx'):
-                input_string = read_docx(file)
-            elif filename.endswith('.pdf'):
-                input_string = read_pdf(file)
-            else:
-                return render_template('text_to_color.html', error="Unsupported file format")
-        else:
-            return render_template('text_to_color.html', error="No input provided")
-       
-        palette = generate_color_palette()
-       
-        image, color_code = string_to_color_pattern(input_string, palette)
-       
-        image_chunks = split_image_into_chunks(image, chunk_size=200)
-        return render_template('text_to_color_representation.html', image_chunks=image_chunks, color_code=color_code)
-    return render_template('text_to_color.html')
-@app.route('/color-to-text', methods=['GET', 'POST'])
-def color_to_text():
-    if request.method == 'POST':
-        if 'color_code' in request.form and request.form['color_code']:
-            color_code_input = request.form['color_code']
-            print('strip',color_code_input.strip())
-            color_code = color_code_input.strip().strip('][').split('),')
-            cz = []
-            for x in color_code:
-                z = x.strip().strip('(').strip(')')
-                z = z.split(',')
-                u,v,w = z
-                z = (int(u),int(v),int(w))
-                cz.append(tuple(z))
-            print(cz)
-            print(color_code)
-            palette = generate_color_palette()
-            original_text = color_code_to_string(cz, palette)
-            return render_template('color_to_text.html', original_text=original_text, color_code=color_code_input)
-        else:
-            return render_template('color_to_text.html', error="No input provided")
-    return render_template('color_to_text.html')
-colors = plt.cm.Set1(np.linspace(0, 1, len(freqs_org))) # Choose your preferred colormap
-frequency_colors_update = {
-    "m_as_in_mat": {"range": (100, 200), "color": (255, 0, 0)}, # Red
-    "p_as_in_pat": {"range": (100, 200), "color": (139, 0, 0)}, # Dark Red
-    "b_as_in_bat": {"range": (100, 300), "color": (255, 127, 80)}, # Coral
-    "d_as_in_dog": {"range": (200, 400), "color": (255, 165, 0)}, # Orange
-    "g_as_in_go": {"range": (200, 600), "color": (255, 215, 0)}, # Gold
-    "n_as_in_no": {"range": (200, 600), "color": (255, 255, 0)}, # Yellow
-    "w_as_in_wet": {"range": (200, 1000), "color": (255, 255, 224)}, # Light Yellow
-    "r_as_in_rat": {"range": (200, 1000), "color": (255, 250, 205)}, # Lemon
-    "ŋ_as_in_sing": {"range": (200, 1000), "color": (0, 255, 0)}, # Green
-    # Mid Frequency Sounds
-    "ɑ_as_in_father": {"range": (700, 1100), "color": (0, 100, 0)}, # Dark Green
-    "o_as_in_pot": {"range": (300, 1500), "color": (50, 205, 50)}, # Lime
-    "h_as_in_hat": {"range": (1000, 2000), "color": (128, 128, 0)}, # Olive
-    "ð_as_in_this": {"range": (1000, 3000), "color": (189, 252, 201)}, # Mint
-    "e_as_in_bed": {"range": (400, 2000), "color": (0, 255, 255)}, # Light Blue
-    "u_as_in_put": {"range": (250, 2000), "color": (64, 224, 208)}, # Turquoise
-    "i_as_in_sit": {"range": (250, 3000), "color": (46, 139, 87)}, # Sea Wave
-    "a_as_in_cat": {"range": (500, 2500), "color": (135, 206, 235)}, # Sky Blue
-    "l_as_in_lamp": {"range": (300, 3000), "color": (0, 0, 255)}, # Blue
-    "t_as_in_top": {"range": (300, 3000), "color": (0, 0, 139)}, # Dark Blue
-    "ʌ_as_in_cup": {"range": (500, 1500), "color": (65, 105, 225)}, # Royal Blue
-    "ə_as_in_sofa": {"range": (500, 1500), "color": (128, 0, 128)}, # Violet
-    "j_as_in_jump": {"range": (500, 2000), "color": (221, 160, 221)}, # Plum
-    "æ_as_in_cat": {"range": (500, 2500), "color": (230, 230, 250)}, # Lavender
-    # High Frequency Sounds
-    "k_as_in_kite": {"range": (1500, 4000), "color": (255, 0, 255)}, # Magenta
-    "f_as_in_fish": {"range": (1700, 2000), "color": (139, 0, 139)}, # Dark Magenta
-    "v_as_in_vet": {"range": (200, 5000), "color": (255, 192, 203)}, # Pink
-    "s_as_in_sat": {"range": (2000, 5000), "color": (255, 182, 193)}, # Light Pink
-    "ʒ_as_in_measure": {"range": (2000, 5000), "color": (250, 128, 114)}, # Salmon
-    "ʃ_as_in_she": {"range": (2000, 8000), "color": (210, 105, 30)}, # Chocolate
-    "z_as_in_zoo": {"range": (3000, 7000), "color": (165, 42, 42)}, # Brown
-    "θ_as_in_thin": {"range": (6000, 8000), "color": (255, 140, 0)} # Dark Orange
-}
-@app.route('/record', methods=['GET', 'POST'])
-def record():
-    if request.method == 'POST':
-        if 'file' in request.files:
-            # Handle file upload
-            audio_file = request.files['file']
-            if audio_file.filename.endswith(('.mp3', '.wav')):
-               
-                # Save the uploaded file temporarily
-                temp_filename = 'uploaded_audio.wav' if audio_file.filename.endswith('.wav') else 'uploaded_audio.mp3'
-                audio_file.save(temp_filename)
-                # Read audio data using soundfile
-                audio_data, sample_rate = sf.read(temp_filename)
-                #audio_segment.export('uploaded_audio.wav', format='wav')
-                #audio_data = np.array(audio_segment.get_array_of_samples())
-                audio_data = audio_data.reshape(-1, 1)
-                return process_audio(audio_data)
-            else:
-                return 'Unsupported file format. Please upload MP3 or WAV.', 400
-        else:
-            # Handle recording
-            duration = int(request.form['duration'])
-            print("Recording starts...")
-            audio_data = sd.rec(int(duration * Fs), samplerate=Fs, channels=1, dtype='float64')
-            sd.wait()
-            print("Recording completed.")
-            return process_audio(audio_data)
-    return render_template('frequency_plot.html', spectrum_image=None)
-def process_audio(audio_data):
-    if audio_data.ndim > 1 and audio_data.shape[1] > 1:
-        print("Audio has more than one channel. Using the first channel.")
-        audio_data = audio_data[:, 0] # Select the first channel
-       
-    L = len(audio_data)
-    Y = fft(audio_data.flatten())
-    P2 = np.abs(Y / L)
-    P1 = P2[:L // 2 + 1]
-    P1[1:-1] = 2 * P1[1:-1]
-    f = Fs * np.arange((L // 2) + 1) / L
-           
-    return f,P1
-    #return f'<h2>Frequency Spectrum</h2><img src="data:image/png;base64,{plot_url}" alt="Frequency Spectrum">'
-@app.route('/upload', methods=['POST'])
-def upload_file():
-    return record() # Delegate to the record function
-@dash_app.callback(
-    Output('bar-chart', 'figure'),
-    [Input('frequency-data', 'data')]
-)
-@dash_app.callback(
-    Output('bar-chart', 'figure'),
-    [Input('frequency-data', 'data')]
-)
-def update_bar_chart(frequency_data):
-    if not frequency_data:
-        return go.Figure() # Return empty figure if no data
-    freqq=pd.read_csv('freq.csv')
-               
-    frequency_data=freqq
-    frequencies = list(frequency_data['frequencies'])
-    amplitudes = list(frequency_data['amplitudes'])
-        
-    # Convert received data into a DataFrame
-    df = pd.DataFrame(frequency_data)
-    frequencies = list(df['frequencies'])
-    amplitudes = list(df['amplitudes'])
-    fig = go.Figure(data=[
-        go.Bar(
-            x=frequencies,
-            y=amplitudes,
-            marker_color='rgba(0, 100, 200, 0.6)'
-        )
-    ])
-    box_traces = []
-    for note in frequency_colors_update:
-        lower_bound, upper_bound = frequency_colors_update[note]["range"]
-        freq_data = df[(df['Frequency'] > lower_bound) & (df['Frequency'] < upper_bound)]
-        if not freq_data.empty:
-            box_traces.append(go.Box(
-                y=freq_data['Amplitude'],
-                name=note,
-                marker_color=f'rgba({",".join(map(str, frequency_colors_update[note]["color"]))}, 0.6)'
-            ))
-    fig.add_traces(box_traces)
-    fig.update_layout(
-        title='Frequency vs Amplitude',
-        xaxis_title='Frequency',
-        yaxis_title='Amplitude'
-    )
-    return fig
-# Layout for Dash app
-df = px.data.gapminder()
-fig = px.bar(df[df["year"] == 2007], x="continent", y="pop", title="Population by Continent")
-freqq=pd.read_csv('freq.csv')
-               
-frequency_data=freqq
-frequencies = list(frequency_data['frequencies'])
-amplitudes = list(frequency_data['amplitudes'])
-# Convert received data into a DataFrame
-df = pd.DataFrame(frequency_data)
-frequency_data['notes']=['aaa']*len(frequency_data)
-colors=[]
-for note in frequency_colors_update:
-        lower_bound, upper_bound = frequency_colors_update[note]["range"]
-        freq_data = frequency_data[(frequency_data['frequencies'] > lower_bound) & (frequency_data['frequencies'] < upper_bound)]
-        frequency_data.loc[freq_data.index.tolist(),'notes']=note
-        colors.append(f'rgba({",".join(map(str, frequency_colors_update[note]["color"]))}, 0.6)')
-frequency_data=frequency_data[frequency_data['notes']!='aaa']
-frequency_data2=frequency_data.groupby('notes').sum()
-frequency_data2=frequency_data2.reset_index()
-frequency_data2=frequency_data2.sample(len(frequency_data2))
-idx=frequency_data2.index.tolist()
-colors=[colors[i] for i in idx]
-print(frequency_data.head())
-fig2 = px.bar(frequency_data2, x="notes", y="amplitudes", title="Amplitude vs Frequency")
-fig2.update_traces(marker_color=colors)
-dash_app.layout = html.Div([
-    dcc.Graph(id='bar-chart',figure=fig2)
-    #dcc.Store(id='frequency-data', data={}), # To store frequency data
-    #dcc.Graph(id='bar-chart',figure=update_bar_chart(None)),
-    #html.Div(id='graph-container', style={'display': 'none'}) # Hidden div for handling updates
-])
-# Callback to load frequency data from session when a request is made
-@dash_app.callback(
-    Output('frequency-data', 'data'),
-    [Input('bar-chart', 'id')] # Dummy input to trigger callback
-)
-def load_frequency_data(_):
-    frequency_data = session.get('frequency_data', {})
-    return frequency_data # Return the data to the Store
-# Config
-UPLOAD_FOLDER = 'static/uploads'
-OUTPUT_FOLDER = 'static/output'
-ALLOWED_EXTENSIONS = {'wav', 'mp3', 'ogg', 'flac'}
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['OUTPUT_FOLDER'] = OUTPUT_FOLDER
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-os.makedirs(OUTPUT_FOLDER, exist_ok=True)
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-@app.route('/process_gif', methods=['GET', 'POST'])
-def process_gif():
-    gif_filename = None
-    if request.method == 'POST':
-        if 'audio' not in request.files:
-            return 'No file part'
-        file = request.files['audio']
-        if file.filename == '':
-            return 'No selected file'
-        if file and allowed_file(file.filename):
-            filename = secure_filename(file.filename)
-            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            file.save(filepath)
-            gif_filename = os.path.splitext(filename)[0] + '.gif'
-            gif_filename = 'music.png'
-            gif_path = os.path.join(app.config['OUTPUT_FOLDER'], gif_filename)
-            print('here',gif_path)
-            # Process uploaded audio and generate GIF
-            process_audio_to_gif(filepath, gif_path)
-  
-    return render_template('index.html', gif_file=gif_filename)
-@app.route('/static/output/<filename>')
-def serve_gif(filename):
-    return send_from_directory(app.config['OUTPUT_FOLDER'], filename)
-   
-@app.route('/download/<filename>')
-def download_gif(filename):
-    return send_from_directory(app.config['OUTPUT_FOLDER'], filename, as_attachment=True)
 def color_distance(c1, c2):
     return sum((a - b) ** 2 for a, b in zip(c1, c2)) ** 0.5
-# 1. Colour → note-label map (exact RGB tuples)
-# ----------------------------------------------------------------------
-# ----------------------------------------------------------------------
-# 1. Complete colour → note-label map (extracted and cleaned from your list)
-# ----------------------------------------------------------------------
-# ===================================================================
-# ACCURATE COLOR → NOTE MAPPING BASED ON YOUR ACTUAL .WAV FILES
-# ===================================================================
 
-# This maps exact RGB colors to the note name used in your filenames
-# I derived these colors from standard piano sample color schemes and your file list
-# You can tweak any RGB if a color doesn't match perfectly when you draw it
+# Tone generation function
+def generate_tone(frequencies, brush, duration=DURATION_PER_STEP):
+    valid_brushes = {"spray", "star", "cross", "square", "triangle", "sawtooth", "round", "line"}
+    if brush.lower() not in valid_brushes:
+        raise ValueError(f"Invalid brush type: {brush}. Valid options are {valid_brushes}")
 
-color_to_note_exact = {
-    # Low octaves - dark reds/oranges
-    (139, 0, 0): "A0",                  # Dark Red
-    (255, 94, 0): "A 0Bb0",             # Deep Orange (if you have A 0Bb0.wav)
-    (255, 140, 0): ["A 1Bb1", "A#3Bb3"], # Orange - used for several Bb/A#
-    (255, 165, 0): ["A 2Bb2", "A 3Bb3"],
-    (255, 190, 0): "A 4Bb4",
-    (255, 215, 0): "A 5Bb5",
+    t = np.linspace(0, duration, int(SAMPLE_RATE * duration), False)
+    
+    if frequencies == 0:
+        return np.zeros_like(t)
 
-    # A notes
-    (200, 0, 0): "A0",
-    (220, 50, 50): "A1",
-    (240, 80, 80): "A2",
-    (255, 110, 110): "A3",
-    (255, 140, 140): "A4",
-    (255, 170, 170): "A5",
-    (255, 200, 200): "A6",
-    (255, 230, 230): "A7",
+    if not isinstance(frequencies, (list, np.ndarray)) or len(frequencies) == 0:
+        return np.zeros_like(t)
 
-    # B notes - yellows
-    (255, 255, 0): ["B3", "B4", "B5", "B6", "B7"],
-    (255, 255, 100): "B5",
-    (255, 255, 200): "B6",
+    frequencies = np.clip(frequencies, 20, 20000)
+    waveform = np.zeros_like(t)
 
-    # C notes - greens
-    (0, 100, 0): "C#1Db1",
-    (0, 130, 0): "C1",
-    (0, 160, 0): "C2",
-    (0, 200, 0): ["C3", "C#3Db3"],
-    (0, 255, 0): "C4",                 # Bright Green = Middle C
-    (100, 255, 100): "C5",
-    (150, 255, 150): "C6",
-    (200, 255, 200): "C7",
-    (220, 255, 220): "C8",
+    for freq in frequencies:
+        phase = 2 * np.pi * freq * t
+        if brush.lower() == "spray":
+            mod_ratio = 1.7 + 0.3 * np.sin(2 * np.pi * 0.2 * t)
+            carrier = np.sin(phase + 3 * np.sin(mod_ratio * phase))
+            tone = carrier * (0.6 + 0.4 * np.sin(2 * np.pi * 5 * t))
+            noise = 0.15 * np.random.normal(0, 1, len(t))
+            noise = signal.lfilter(*signal.butter(4, 1000/(SAMPLE_RATE/2)), noise)
+            tone = tone * (0.7 + 0.3 * np.sin(2 * np.pi * 3 * t)) + noise
+        elif brush.lower() == "star":
+            harmonics = [(1, 0.6), (2, 0.4), (3, 0.3), (5, 0.2)]
+            tone = sum(np.sin(h * phase) * amp for h, amp in harmonics)
+            detune = 1 + 0.001 * np.sin(2 * np.pi * 0.1 * t)
+            tone = tone * detune
+        elif brush.lower() == "cross":
+            distorted_phase = phase + 0.8 * np.sin(phase)
+            tone = np.sin(distorted_phase) * np.sin(2 * distorted_phase)
+        elif brush.lower() == "square":
+            pw = 0.5 + 0.3 * np.sin(2 * np.pi * 0.5 * t)
+            tone = signal.square(phase, duty=pw)
+        elif brush.lower() == "triangle":
+            tone = signal.sawtooth(phase, width=0.5)
+            tone -= 0.25 * signal.sawtooth(2 * phase, width=0.5)
+        elif brush.lower() == "sawtooth":
+            detune = [0.99, 1.0, 1.01]
+            tone = sum(0.4 * np.sin(2 * np.pi * d * freq * t) for d in detune)
+        else:  # round or line
+            vibrato = 0.1 * np.sin(2 * np.pi * 6 * t)
+            tone = 0.9 * np.sin(phase + vibrato) + 0.1 * np.sin(3 * phase)
+        
+        waveform += tone
 
-    # C#/Db - darker greens
-    (0, 180, 0): "C#2Db2",
-    (0, 210, 0): ["C#4Db4", "C#5Db5", "C#7Db7"],
-    (50, 230, 50): "C#6Db6",
+    envelope = np.ones_like(t)
+    attack_len = int(0.1 * len(t))
+    attack_len = max(1, attack_len)
+    envelope[:attack_len] = np.linspace(0, 1, attack_len)
+    envelope[attack_len:] = np.exp(-5 * np.linspace(0, 1, len(t) - attack_len))
+    waveform *= envelope
 
-    # D notes - blues/cyans
-    (0, 0, 139): "D1",
-    (0, 0, 180): "D2",
-    (0, 0, 220): "D3",
-    (0, 0, 255): "D4",                 # Pure Blue
-    (100, 100, 255): "D5",
-    (150, 150, 255): "D6",
-    (200, 200, 255): "D7",
+    max_val = np.max(np.abs(waveform))
+    if max_val > 0:
+        waveform /= max_val
 
-    # D#/Eb - dark blues
-    (0, 0, 100): "D#2Eb2",
-    (0, 0, 150): "D#3Eb3",
-    (0, 0, 200): "D#4Eb4",
-    (0, 0, 255): ["D#5Eb5", "D#6Eb6", "D#7Eb7"],  # shares with D4 sometimes
+    return waveform
 
-    # E notes - purples
-    (100, 0, 150): "E1",
-    (128, 0, 192): "E2",
-    (153, 0, 230): "E3",
-    (180, 0, 255): "E4",
-    (200, 100, 255): "E5",
-    (220, 150, 255): "E6",
-    (240, 200, 255): "E7",
 
-    # F notes - magentas/pinks
-    (139, 0, 139): ["F1", "F2", "F3"],
-    (180, 0, 180): "F4",
-    (220, 0, 220): "F5",
-    (255, 100, 255): "F6",
-    (255, 150, 255): "F7",
+# Azure Marketplace Metered Billing
+def report_metered_usage(subscription_id, quantity):
+    try:
+        marketplace_scope = ["https://marketplaceapi.microsoft.com/.default"]
+        token_result = msal_client.acquire_token_for_client(scopes=marketplace_scope)
+        if "access_token" not in token_result:
+            logger.error(f"Failed to acquire token for Marketplace API: {token_result.get('error')}")
+            return False
 
-    # F#/Gb - bright magentas
-    (200, 0, 200): ["F_1Gb1", "F_2Gb2", "F_3Gb3"],
-    (230, 0, 230): ["F_5Gb5", "F_6Gb6", "F_7Gb7"],
-
-    # G notes - reds to orange-reds
-    (180, 0, 0): "G1",
-    (200, 0, 0): "G2",
-    (220, 0, 0): "G3",
-    (255, 0, 0): ["G4", "G5", "G6", "G7"],   # Pure Red
-    (255, 60, 60): "G#4Ab4",
-    (255, 100, 100): "G#5Ab5",
-
-    # G#/Ab - light reds/pinks
-    (220, 50, 50): "G#1Ab",
-    (240, 80, 80): "G#2Ab2",
-    (255, 110, 110): "G#3Ab3",
-    (255, 140, 140): "G#6Ab6",
-    (255, 170, 170): "G#7Ab7",
-}
-
-def get_note_from_color(r, g, b):
-    col = (r, g, b)
-    if col in color_to_note_exact:
-        value = color_to_note_exact[col]
-        if isinstance(value, list):
-            print(f"[COLOR MATCH] Exact RGB {col} → multiple notes: {value}")
-            return value  # Return list
+        headers = {
+            "Authorization": f"Bearer {token_result['access_token']}",
+            "Content-Type": "application/json"
+        }
+        metering_url = f"https://marketplaceapi.microsoft.com/api/usageEvent?api-version=2018-08-31"
+        payload = {
+            "resourceUri": f"/subscriptions/{subscription_id}",
+            "quantity": quantity,
+            "dimension": "additional_submission",
+            "effectiveStartTime": datetime.utcnow().isoformat(),
+            "planId": "basic-usage-based"
+        }
+        response = requests.post(metering_url, headers=headers, json=payload)
+        if response.status_code == 200:
+            logger.info(f"Reported metered usage: {quantity} submissions for {subscription_id}")
+            return True
         else:
-            print(f"[COLOR MATCH] Exact RGB {col} → {value}")
-            return value  # Return single string
+            logger.error(f"Failed to report metered usage: {response.status_code}, {response.text}")
+            return False
+    except Exception as e:
+        logger.error(f"Error reporting metered usage: {str(e)}")
+        return False
 
-    # Fallback: closest color match
-    min_dist = float('inf')
-    best_note = "C4"
-    for known_rgb, note in color_to_note_exact.items():
-        dist = color_distance((r, g, b), known_rgb)
-        if dist < min_dist:
-            min_dist = dist
-            if isinstance(note, list):
-                best_note = note[0]  # Pick first as fallback
-            else:
-                best_note = note
+# Database connection
+def get_db_connection():
+    try:
+        connection_string = f"DRIVER={app.config['DB_DRIVER']};SERVER={app.config['DB_SERVER']};DATABASE={app.config['DB_NAME']};UID={app.config['DB_USER']};PWD={app.config['DB_PASSWORD']}"
+        connection = pyodbc.connect(connection_string)
+        logger.info("Successfully connected to SQL Server database")
+        return connection
+    except pyodbc.Error as e:
+        logger.error(f"Error connecting to SQL Server: {e}")
+        return None
 
-    print(f"[COLOR MATCH] Closest (dist={min_dist:.1f}) RGB {col} → {best_note}")
-    return best_note  # Always return string or list consistently
+# Security headers
+@app.after_request
+def after_request(response):
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    return response
 
+# Webhook for Azure Marketplace
+@app.route('/webhook', methods=['POST'])
+def marketplace_webhook():
+    logger.info("Received webhook request from Azure Marketplace")
+    try:
+        payload = request.get_json()
+        if not payload:
+            logger.error("No JSON payload provided in webhook request")
+            return jsonify({"error": "No payload provided"}), 400
 
+        logger.info(f"Webhook payload: {payload}")
+        operation_id = payload.get('operationId')
+        action = payload.get('action')
+        subscription_id = payload.get('subscriptionId')
+        plan_id = payload.get('planId')
 
+        if not all([operation_id, action, subscription_id]):
+            logger.error("Missing required fields in webhook payload")
+            return jsonify({"error": "Missing required fields"}), 400
 
-@app.route('/drawing2audio')
-def drawing2audio():
-    return render_template('drawing_to_note.html')
+        connection = get_db_connection()
+        if not connection:
+            logger.error("Database connection failed")
+            return jsonify({"error": "Database connection failed"}), 500
 
-from scipy.io.wavfile import write  # Make sure this import is at the top of your file
+        try:
+            cursor = connection.cursor()
+            insert_query = """
+                INSERT INTO marketplace_events (operation_id, action, subscription_id, plan_id, event_timestamp)
+                VALUES (?, ?, ?, ?, ?)
+            """
+            cursor.execute(insert_query, (
+                operation_id,
+                action,
+                subscription_id,
+                plan_id,
+                datetime.now()
+            ))
+            connection.commit()
+            logger.info(f"Stored webhook event: {action} for subscription {subscription_id}")
+        except pyodbc.Error as e:
+            logger.error(f"Database error: {str(e)}")
+            return jsonify({"error": "Failed to store webhook event"}), 500
+        finally:
+            cursor.close()
+            connection.close()
+            logger.info("Database connection closed")
 
-@app.route('/submit', methods=['POST'])
-def submit():
+        if action == "Subscribed":
+            logger.info(f"Processing subscription activation for {subscription_id}")
+            # Optionally resolve subscription here
+        elif action == "Unsubscribed":
+            logger.info(f"Processing subscription cancellation for {subscription_id}")
+        else:
+            logger.warning(f"Unhandled action: {action}")
+
+        return jsonify({"status": "success", "operationId": operation_id}), 200
+    except Exception as e:
+        logger.error(f"Error processing webhook: {str(e)}")
+        return jsonify({"error": f"Webhook processing failed: {str(e)}"}), 500
+
+# Resolve Azure Marketplace subscription
+def resolve_subscription(operation_id):
+    try:
+        marketplace_scope = ["https://marketplaceapi.microsoft.com/.default"]
+        token_result = msal_client.acquire_token_for_client(scopes=marketplace_scope)
+        if "access_token" not in token_result:
+            logger.error(f"Failed to acquire token for Marketplace API: {token_result.get('error')}")
+            return False
+
+        headers = {"Authorization": f"Bearer {token_result['access_token']}"}
+        resolve_url = f"https://marketplaceapi.microsoft.com/api/saas/subscriptions/resolve?api-version=2018-08-31"
+        response = requests.post(resolve_url, headers=headers, json={"operationId": operation_id})
+        
+        if response.status_code == 200:
+            logger.info(f"Subscription resolved: {response.json()}")
+            return True
+        else:
+            logger.error(f"Failed to resolve subscription: {response.status_code}, {response.text}")
+            return False
+    except Exception as e:
+        logger.error(f"Error resolving subscription: {str(e)}")
+        return False
+
+# Routes
+@app.route("/")
+def home():
+    logger.info("Rendering front page")
+    user = session.get('user')
+    show_welcome = session.get('show_welcome', False)
+    if show_welcome:
+        session.pop('show_welcome')  # Clear the flag after rendering
+    return render_template("index.html", user=user, show_welcome=show_welcome)
+
+@app.route("/auth")
+def auth():
+    logger.info(f"Generating auth URL with redirect_uri: {REDIRECT_URI}")
+    try:
+        auth_url = msal_client.get_authorization_request_url(
+            SCOPE,
+            redirect_uri=REDIRECT_URI,
+            response_type="code"
+        )
+        logger.info(f"Auth URL: {auth_url}")
+        return redirect(auth_url)
+    except Exception as e:
+        logger.error(f"Error generating auth URL: {str(e)}")
+        return render_template("error.html", error=f"Failed to initiate authentication: {str(e)}"), 500
+
+@app.route("/getAToken")
+def authorized():
+    logger.info(f"Received callback: {request.url}")
+    code = request.args.get('code')
+    logger.info(f"Received auth code: {'present' if code else 'missing'}")
+    if not code:
+        logger.error("No code provided in callback")
+        return render_template("error.html", error="Authentication failed: No code provided"), 400
+    try:
+        logger.info(f"Attempting token acquisition with redirect_uri: {REDIRECT_URI}, scopes: {SCOPE}")
+        token_result = msal_client.acquire_token_by_authorization_code(
+            code,
+            scopes=SCOPE,
+            redirect_uri=REDIRECT_URI
+        )
+        logger.info(f"Token result: {token_result}")
+        if "error" in token_result:
+            logger.error(f"Auth error: {token_result['error']}, Description: {token_result.get('error_description')}")
+            return render_template("error.html", error=f"Authentication failed: {token_result['error']} - {token_result.get('error_description')}"), 400
+        session['access_token'] = token_result['access_token']
+        logger.info("Token acquired successfully")
+        graph_endpoint = "https://graph.microsoft.com/v1.0/me"
+        headers = {"Authorization": f"Bearer {session['access_token']}"}
+        logger.info("Fetching user profile from Microsoft Graph")
+        user_response = requests.get(graph_endpoint, headers=headers)
+        if user_response.status_code == 200:
+            user_data = user_response.json()
+            session['user'] = {
+                'name': user_data.get('displayName', 'Unknown User'),
+                'email': user_data.get('mail') or user_data.get('userPrincipalName', 'Unknown Email')
+            }
+            session['show_welcome'] = True
+            logger.info(f"User logged in: {session['user']['name']} ({session['user']['email']})")
+        else:
+            logger.error(f"Failed to fetch user profile: {user_response.status_code}, {user_response.text}")
+            session.pop('access_token', None) # Clear token on failure
+            return render_template("error.html", error="Failed to fetch user profile"), 400
+        session.modified = True # Ensure session is marked as modified
+        return redirect(url_for('home'))
+    except Exception as e:
+        logger.error(f"Unexpected error in auth: {str(e)}", exc_info=True)
+        return render_template("error.html", error=f"Authentication failed: {str(e)}"), 500
+@app.route("/logout")
+def logout():
+    session.clear()
+    session['show_welcome'] = False
+    logger.info("User logged out")
+    return redirect(url_for('home'))
+@app.route('/about')
+def about():
+    user = session.get('user') # Retrieve user from session for authentication
+    return render_template('about.html', user=user)
+@app.route("/pricing")
+def pricing():
+    logger.info("Rendering Pricing page")
+    user = session.get('user')
+    return render_template("pricing.html", user=user)
+@app.route("/privacy")
+def privacy():
+    logger.info("Rendering Privacy Policy page")
+    user = session.get('user')
+    return render_template("privacy.html", user=user)
+@app.route("/support")
+def support():
+    logger.info("Rendering Support page")
+    user = session.get('user')
+    return render_template("support.html", user=user)
+@app.route("/admin")
+def admin():
+    conn = get_db_connection()
+    if not conn:
+        return "Database error", 500
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT short_id, ticket_uuid, user_email, category, status, created_at
+            FROM SupportTickets
+            ORDER BY created_at DESC
+        """)
+        tickets = []
+        for row in cur.fetchall():
+            tickets.append({
+                "short_id": row[0],
+                "uuid": str(row[1]),
+                "email": row[2],
+                "category": row[3],
+                "status": row[4],
+                "created": row[5].strftime("%b %d, %Y %I:%M %p") if row[5] else "Unknown"
+            })
+        return render_template("admin.html", tickets=tickets)
+    except Exception as e:
+        logger.error(f"Admin page error: {e}")
+        return "Server error", 500
+    finally:
+        cur.close()
+        conn.close()
+@app.route("/api/support", methods=['POST'])
+def create_ticket():
     data = request.get_json()
-    if not data or 'image' not in data:
-        return jsonify({"error": "No image data"}), 400
+    if not data:
+        return jsonify({"error": "No data"}), 400
+    category = data.get('category')
+    user_email = data.get('user_email')
+    user_message = data.get('user_message')
+    if not all([category, user_email, user_message]):
+        return jsonify({"error": "category, user_email, user_message required"}), 400
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({"error": "DB error"}), 500
+    try:
+        cur = conn.cursor()
+        ticket_uuid = str(uuid.uuid4())
+        now = datetime.utcnow().isoformat() + "Z"
+        messages = [{"time": now, "sender": "user", "user": user_message, "assistant": None}]
+        messages_json = json.dumps(messages)
+        sql = """
+            INSERT INTO SupportTickets
+                (ticket_uuid, user_email, category, messages, status, created_at)
+            VALUES (?, ?, ?, ?, 'Open', GETDATE())
+        """
+        cur.execute(sql, (ticket_uuid, user_email, category, messages_json))
+        conn.commit()
+        # Get short_id
+        cur.execute("SELECT short_id FROM SupportTickets WHERE ticket_uuid = ?", (ticket_uuid,))
+        short_id = cur.fetchone()[0]
+        # SEND CONFIRMATION EMAIL TO USER
+        send_user_confirmation(user_email, short_id, category, user_message)
+        return jsonify({
+            "ticket_uuid": ticket_uuid,
+            "short_id": short_id,
+            "message": "We have received your ticket. Our team will reply soon.",
+            "chat": messages,
+            "chat_url": url_for('chat_page', short_id=short_id, _external=True)
+        }), 201
+    except Exception as e:
+        logger.error(f"Error: {e}")
+        return jsonify({"error": "Failed to create ticket"}), 500
+    finally:
+        cur.close()
+        conn.close()
+@app.route("/api/support", methods=['GET'])
+def list_tickets():
+    user_email = session.get('user', {}).get('email')
+    if not user_email: return jsonify({"error": "Login required"}), 401
+    conn = get_db_connection()
+    if not conn: return jsonify({"error": "DB error"}), 500
+    try:
+        cur = conn.cursor()
+        sql = "SELECT ticket_uuid, title, category, status, created_at, messages FROM SupportTickets WHERE user_email = ? ORDER BY created_at DESC"
+        cur.execute(sql, (user_email,))
+        tickets = []
+        for row in cur.fetchall():
+            chat = json.loads(row.messages) if row.messages else []
+            tickets.append({
+                "ticket_uuid": row.ticket_uuid,
+                "title": row.title,
+                "category": row.category,
+                "status": row.status,
+                "created_at": row.created_at.isoformat(),
+                "chat": chat # Full conversation
+            })
+        return jsonify({"tickets": tickets}), 200
+    except Exception as e:
+        logger.error(f"Error: {e}")
+        return jsonify({"error": "Failed"}), 500
+    finally:
+        cur.close()
+        conn.close()
 
-    img_data = data['image'].split(',')[1]
-    img_bytes = base64.b64decode(img_data)
-    img = Image.open(BytesIO(img_bytes)).convert('RGBA')
-    pixels = img.load()
-    width, height = img.size
 
-    # We'll collect segments: (dict_of_note_to_weight, pixel_width)
-    segments = []
-    current_note_weights = {}  # note_name -> total pixel count in this column group
-    start_x = 0
 
-    print("\nAnalyzing drawing with thickness-aware volume...")
+@app.route("/support/<short_id>")
+def chat_page(short_id):
+    user = session.get('user')
+    ticket_uuid = short_to_uuid(short_id)
 
-    for x in range(width + 1):
-        column_pixel_counts = {}  # color_rgb -> count of non-transparent pixels
+    logger.info(f"[DEBUG] short_id: {short_id}, ticket_uuid: {ticket_uuid}")
 
-        if x < width:
-            for y in range(height):
-                r, g, b, a = pixels[x, y]
+    if not ticket_uuid:
+        return render_template("error.html", error=f"Invalid short_id: {short_id}"), 404
 
-                # Skip transparent or background
-                if a < 128:
-                    continue
-                if max(r, g, b) < 60 or (abs(r-g) < 20 and abs(g-b) < 20 and abs(r-b) < 20):
-                    continue
+    conn = get_db_connection()
+    if not conn:
+        return render_template("error.html", error="Database connection failed"), 500
 
-                rgb = (r, g, b)
-                column_pixel_counts[rgb] = column_pixel_counts.get(rgb, 0) + 1
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT ticket_uuid, user_email, category, status, messages FROM SupportTickets WHERE ticket_uuid = ?",
+            (ticket_uuid,)
+        )
+        row = cur.fetchone()
+        if not row:
+            return render_template("error.html", error=f"Ticket not found: {ticket_uuid}"), 404
 
-        # Convert RGB counts → note names with weights
-        new_note_weights = {}
-        total_active_pixels = sum(column_pixel_counts.values())
+        logger.info(f"[DEBUG] Raw messages: {repr(row[4])}")
 
-        if total_active_pixels > 0:
-            for rgb, count in column_pixel_counts.items():
-                note_candidates = get_note_from_color(*rgb)
-
-                # Handle case where one color maps to multiple possible notes
-                if isinstance(note_candidates, list):
-                    note_name = note_candidates[0]  # pick first, or you can prefer higher octave
+        # FIXED: Handle double-encoded JSON
+        chat = []
+        if row[4]:
+            try:
+                parsed = json.loads(row[4])
+                if isinstance(parsed, list):
+                    for item in parsed:
+                        if isinstance(item, str):
+                            try:
+                                msg = json.loads(item)
+                                if isinstance(msg, dict) and msg.get("sender") in ["user", "support"]:
+                                    chat.append(msg)
+                            except json.JSONDecodeError:
+                                continue
+                        elif isinstance(item, dict) and item.get("sender") in ["user", "support"]:
+                            chat.append(item)
                 else:
-                    note_name = note_candidates
+                    logger.warning(f"messages is not a list: {parsed}")
+            except json.JSONDecodeError as e:
+                logger.error(f"JSON decode failed: {e}")
+                chat = []
 
-                if note_name:
-                    # Weight = how many pixels this color has (thickness)
-                    new_note_weights[note_name] = new_note_weights.get(note_name, 0) + count
+        logger.info(f"[DEBUG] Final chat: {chat}")
 
-        # Detect change in note set or significant weight change
-        if new_note_weights != current_note_weights:
-            if current_note_weights and start_x < x:
-                px_width = x - start_x
-                segments.append((current_note_weights.copy(), px_width))
-                print(f"→ Notes {sorted(current_note_weights.keys())} over {px_width}px "
-                      f"(weights: { {k: round(v/total_active_pixels_prev if 'total_active_pixels_prev' in locals() else v, 2) for k,v in current_note_weights.items()} })")
+        # Add welcome
+        if not any(m.get("sender") == "support" for m in chat):
+            chat.insert(0, {
+                "sender": "support",
+                "assistant": "Welcome to support! How can we help you today?",
+                "time": datetime.utcnow().isoformat() + "Z"
+            })
 
-            start_x = x
-            current_note_weights = new_note_weights
-            total_active_pixels_prev = total_active_pixels  # for debug print
+        return render_template(
+            "support_chat.html",
+            user=user,
+            short_id=short_id,
+            category=row[2] or "General",
+            status=row[3] or "Open",
+            chat=chat
+        )
 
-    # Final segment
-    if current_note_weights and start_x < width:
-        px_width = width - start_x
-        segments.append((current_note_weights.copy(), px_width))
+    except Exception as e:
+        logger.error(f"chat_page crash: {e}")
+        return render_template("error.html", error="Server error"), 500
+    finally:
+        cur.close()
+        conn.close()
 
-    if not segments:
-        return jsonify({"error": "No recognizable colored pixels detected"}), 400
 
-    # Scale total duration
-    TOTAL_MAX_DURATION = 12.0
-    total_pixels = sum(px_width for _, px_width in segments)
-    if total_pixels == 0:
-        total_pixels = 1
+@app.route("/admin/support/<short_id>")
+def admin_chat_page(short_id):
+    ticket_uuid = short_to_uuid(short_id)
+    logger.info(f"[ADMIN] short_id: {short_id} → {ticket_uuid}")
 
-    audio_segments = []
+    if not ticket_uuid:
+        return render_template("error.html", error=f"Invalid short_id: {short_id}"), 404
 
-    for note_weights, px_width in segments:
-        duration = (px_width / total_pixels) * TOTAL_MAX_DURATION
-        sample_count = int(SAMPLE_RATE * duration)
-        mixed = np.zeros(sample_count, dtype=np.float32)
+    conn = get_db_connection()
+    if not conn:
+        return render_template("error.html", error="Database connection failed"), 500
 
-        if not note_weights:
-            audio_segments.append(mixed)
-            continue
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT ticket_uuid, user_email, category, status, messages FROM SupportTickets WHERE ticket_uuid = ?",
+            (ticket_uuid,)
+        )
+        row = cur.fetchone()
+        if not row:
+            return render_template("error.html", error=f"Ticket not found: {ticket_uuid}"), 404
 
-        total_weight = sum(note_weights.values())
-        if total_weight == 0:
-            audio_segments.append(mixed)
-            continue
+        logger.info(f"[ADMIN] Raw messages: {repr(row[4])}")
 
-        for note_name, pixel_count in note_weights.items():
-            sample = load_piano_sample(note_name)
-            if len(sample) == 0:
-                continue
+        chat = []
+        if row[4]:
+            try:
+                parsed = json.loads(row[4])
+                if isinstance(parsed, list):
+                    for item in parsed:
+                        if isinstance(item, str):
+                            try:
+                                msg = json.loads(item)
+                                if isinstance(msg, dict) and msg.get("sender") in ["user", "support"]:
+                                    chat.append(msg)
+                            except json.JSONDecodeError:
+                                continue
+                        elif isinstance(item, dict) and item.get("sender") in ["user", "support"]:
+                            chat.append(item)
+                else:
+                    logger.warning(f"messages not a list: {parsed}")
+            except json.JSONDecodeError as e:
+                logger.error(f"JSON error: {e}")
+                chat = []
 
-            # Resize sample to segment length
-            if len(sample) > sample_count:
-                seg = sample[:sample_count]
-            else:
-                seg = np.pad(sample, (0, sample_count - len(sample)))
+        logger.info(f"[ADMIN] Final chat: {chat}")
 
-            # Volume based on thickness: proportion of column filled by this color
-            volume = pixel_count / total_weight  # 0.0 to 1.0 (or >1 if only one color)
-            volume = min(volume * 1.8, 1.0)  # boost a bit but avoid clipping
+        return render_template(
+            "admin_chat.html",
+            short_id=short_id,
+            category=row[2] or "General",
+            status=row[3] or "Open",
+            chat=chat
+        )
 
-            seg *= volume
+    except Exception as e:
+        logger.error(f"admin_chat_page crash: {e}")
+        return render_template("error.html", error="Server error"), 500
+    finally:
+        cur.close()
+        conn.close()
 
-            mixed += seg
+# ========================================
+# ADD THIS FUNCTION: short_to_uuid()
+# ========================================
+def short_to_uuid(short_id: str):
+    """
+    Convert 8-char short_id (first 8 chars of UUID without dashes) to full UUID.
+    Example: 'BB9D2634' → 'BB9D2634-3540-4411-B9DA-D7E555788364'
+    """
+    if not short_id or len(short_id) != 8:
+        logger.warning(f"Invalid short_id length: {short_id}")
+        return None
 
-        # Overall normalization + headroom
-        max_amp = np.max(np.abs(mixed))
-        if max_amp > 0:
-            mixed /= max_amp * 1.1
+    try:
+        conn = get_db_connection()
+        if not conn:
+            logger.error("DB connection failed in short_to_uuid")
+            return None
 
-        # Gentle fade-out
-        fade_samples = min(3000, sample_count // 5)
-        if fade_samples > 10:
-            fade = np.linspace(1.0, 0.0, fade_samples)
-            mixed[-fade_samples:] *= fade
+        cur = conn.cursor()
+        # Query: Find ticket where first 8 chars of UUID (no dashes) match short_id
+        cur.execute("""
+            SELECT ticket_uuid 
+            FROM SupportTickets 
+            WHERE LEFT(REPLACE(CAST(ticket_uuid AS varchar(36)), '-', ''), 8) = ?
+        """, (short_id.upper(),))
+        row = cur.fetchone()
+        cur.close()
+        conn.close()
 
-        audio_segments.append(mixed)
+        if row:
+            full_uuid = str(row[0])
+            logger.info(f"Resolved short_id {short_id} → {full_uuid}")
+            return full_uuid
+        else:
+            logger.warning(f"short_id {short_id} not found in DB")
+            return None
+    except Exception as e:
+        logger.error(f"Error in short_to_uuid: {e}")
+        return None
 
-    # Concatenate
-    final_audio = np.concatenate(audio_segments)
-    final_audio = np.clip(final_audio, -1.0, 1.0)
-    audio_i16 = (final_audio * 32767).astype(np.int16)
+@app.route("/api/support/<short_id>/reply", methods=['POST'])
+def add_reply(short_id):
+    data = request.get_json()
+    if not data or 'reply' not in data:
+        return jsonify({"error": "reply required"}), 400
 
-    # Save
-    filename = f"piano_thick_{int(time.time() * 1000)}.wav"
-    filepath = os.path.join(OUTPUT_DIR, filename)
-    write(filepath, SAMPLE_RATE, audio_i16)
+    reply_text = data['reply'].strip()
+    if not reply_text:
+        return jsonify({"error": "Empty reply"}), 400
 
-    total_seconds = len(final_audio) / SAMPLE_RATE
-    print(f"SUCCESS! Generated {len(segments)} segments, {total_seconds:.2f}s → {filename}")
+    ticket_uuid = short_to_uuid(short_id)
+    if not ticket_uuid:
+        return jsonify({"error": "Ticket not found"}), 404
 
-    return jsonify({"url": f"/static/audio/{filename}"})
+    new_message = {
+        "sender": "user",
+        "user": reply_text,
+        "time": datetime.utcnow().isoformat() + "Z"
+    }
 
+    logger.info(f"[REPLY] Adding: {new_message}")
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({"error": "DB error"}), 500
+
+    try:
+        cur = conn.cursor()
+
+        # BEFORE
+        cur.execute("SELECT messages FROM SupportTickets WHERE ticket_uuid = ?", (ticket_uuid,))
+        old = cur.fetchone()
+        logger.info(f"[REPLY] Before: {repr(old[0]) if old else None}")
+
+        # FINAL: json.dumps + CAST
+        sql = """
+            UPDATE SupportTickets 
+            SET messages = JSON_MODIFY(messages, 'append $', CAST(? AS NVARCHAR(MAX))) 
+            WHERE ticket_uuid = ?
+        """
+        cur.execute(sql, (json.dumps(new_message), ticket_uuid))
+        affected = cur.rowcount
+        conn.commit()
+
+        logger.info(f"[REPLY] Rows affected: {affected}")
+
+        # AFTER
+        cur.execute("SELECT messages FROM SupportTickets WHERE ticket_uuid = ?", (ticket_uuid,))
+        new = cur.fetchone()
+        logger.info(f"[REPLY] After: {repr(new[0]) if new else None}")
+
+        if affected == 0:
+            return jsonify({"error": "No update"}), 500
+
+        return jsonify({"status": "saved", "message": new_message}), 200
+
+    except Exception as e:
+        logger.error(f"[REPLY ERROR] {e}")
+        return jsonify({"error": "Failed"}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+@app.route("/admin/api/support/<short_id>/reply", methods=['POST'])
+def admin_add_reply(short_id):
+    # === TEMPORARILY DISABLE AUTH FOR TESTING ===
+    # if not session.get('is_admin'):
+    #     return jsonify({"error": "Unauthorized"}), 403
+
+    data = request.get_json()
+    reply = data.get('reply', '').strip()
+    if not reply:
+        return jsonify({"error": "reply required"}), 400
+
+    ticket_uuid = short_to_uuid(short_id)
+    if not ticket_uuid:
+        return jsonify({"error": "Ticket not found"}), 404
+
+    new_message = {
+        "sender": "support",
+        "assistant": reply,
+        "time": datetime.utcnow().isoformat() + "Z"
+    }
+
+    logger.info(f"[ADMIN REPLY] Adding: {new_message}")
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({"error": "DB error"}), 500
+
+    try:
+        cur = conn.cursor()
+
+        # BEFORE
+        cur.execute("SELECT messages FROM SupportTickets WHERE ticket_uuid = ?", (ticket_uuid,))
+        old = cur.fetchone()
+        logger.info(f"[ADMIN REPLY] Before: {repr(old[0]) if old else None}")
+
+        # FIXED: Use CAST + json.dumps
+        cur.execute(
+            "UPDATE SupportTickets SET messages = JSON_MODIFY(messages, 'append $', CAST(? AS NVARCHAR(MAX))) WHERE ticket_uuid = ?",
+            (json.dumps(new_message), ticket_uuid)
+        )
+        affected = cur.rowcount
+        conn.commit()
+
+        logger.info(f"[ADMIN REPLY] Rows affected: {affected}")
+
+        # AFTER
+        cur.execute("SELECT messages FROM SupportTickets WHERE ticket_uuid = ?", (ticket_uuid,))
+        new = cur.fetchone()
+        logger.info(f"[ADMIN REPLY] After: {repr(new[0]) if new else None}")
+
+        if affected == 0:
+            return jsonify({"error": "No update"}), 500
+
+        return jsonify({"status": "saved", "message": new_message}), 200
+
+    except Exception as e:
+        logger.error(f"[ADMIN REPLY ERROR] {e}")
+        return jsonify({"error": "Failed"}), 500
+    finally:
+        cur.close()
+        conn.close()
+        
+@app.route("/submit", methods=['POST'])
+def submit():
+    connection = get_db_connection()
+    if not connection:
+        logger.error("Database connection failed")
+        return jsonify({"error": "Database connection failed"}), 500
+    try:
+        cursor = connection.cursor()
+        # Get submission key (user email or IP address)
+        today = datetime.now().strftime('%Y-%m-%d')
+        submission_key = request.remote_addr
+        is_authenticated = 'user' in session
+        if is_authenticated:
+            submission_key = session['user']['email']
+        # Count submissions for the day
+        query = """
+            SELECT COUNT(*) as count
+            FROM submissions
+            WHERE CAST(submission_date AS DATE) = ?
+            AND (user_email = ? OR ip_address = ?)
+        """
+        cursor.execute(query, (today, submission_key if is_authenticated else None, submission_key if not is_authenticated else None))
+        submission_count = cursor.fetchone()[0]
+        # Check subscription status
+        is_subscribed = False
+        subscription_id = None
+        if is_authenticated:
+            cursor.execute("""
+                SELECT subscription_id
+                FROM subscriptions
+                WHERE user_email = ? AND status = 'active' AND expiry_date > GETDATE()
+            """, (submission_key,))
+            result = cursor.fetchone()
+            if result:
+                is_subscribed = True
+                subscription_id = result[0]
+        # Define limits
+        UNAUTHENTICATED_LIMIT = 5
+        AUTHENTICATED_LIMIT = 10
+        # Check submission limits
+        if not is_authenticated and submission_count >= UNAUTHENTICATED_LIMIT:
+            logger.warning(f"Submission limit exceeded for unauthenticated user (IP: {request.remote_addr})")
+            return jsonify({
+                "error": "You've reached your limit today. Try again after 24 hours or log in to continue."
+            }), 403
+        elif is_authenticated and not is_subscribed and submission_count >= AUTHENTICATED_LIMIT:
+            logger.warning(f"Submission limit exceeded for authenticated user: {submission_key}")
+            return jsonify({
+                "error": "You've reached your submission limit for today. Subscribe to continue.",
+                "subscribe": True,
+                "subscribe_url": SUBSCRIBE_URL
+            }), 403
+        elif is_authenticated and is_subscribed and submission_count >= FREE_SUBMISSION_LIMIT:
+            # Metered billing for additional submissions
+            additional_submissions = submission_count - FREE_SUBMISSION_LIMIT + 1
+            cost = additional_submissions * ADDITIONAL_SUBMISSION_COST
+            cursor.execute("""
+                INSERT INTO billing_records (subscription_id, user_email, submission_id, amount, created_at)
+                VALUES (?, ?, ?, ?, GETDATE())
+            """, (subscription_id, submission_key, None, ADDITIONAL_SUBMISSION_COST))
+            logger.info(f"Charged ${ADDITIONAL_SUBMISSION_COST} for additional submission {submission_count + 1} by {submission_key}")
+            report_metered_usage(subscription_id, 1) # Report 1 additional submission
+        data = request.json
+        if 'image' not in data:
+            logger.error("No image provided in request")
+            return jsonify({"error": "No image provided"}), 400
+        brush = data.get('brush', 'round')
+        image_data = data['image'].split(',')[1]
+        try:
+            img = Image.open(BytesIO(base64.b64decode(image_data))).convert('RGBA')
+        except Exception as e:
+            logger.error(f"Invalid image data: {str(e)}")
+            return jsonify({"error": f"Invalid image data: {str(e)}"}), 400
+        width, height = img.size
+        logger.info(f"Received image size: {width}x{height}")
+        timeline = {}
+        colors_found = set()
+        for x in range(width):
+            freqs = []
+            for y in range(height):
+                r, g, b, a = img.load()[x, y]
+                if not (r == 0 and g == 0 and b == 0) and a > 200:
+                    freq = get_quickly_frequency_by_color(r, g, b)
+                    if freq is None:
+                        freq = get_frequency_from_color(r, g, b)
+                    if freq:
+                        freqs.append(freq)
+                        colors_found.add((r, g, b))
+            if freqs:
+                timeline[x] = list(np.unique(freqs))
+        non_silent_columns = {x: freqs for x, freqs in timeline.items() if freqs}
+        logger.info(f"Processed {len(non_silent_columns)} non-silent columns")
+        logger.info(f"Colors detected: {colors_found}")
+        stop = max((x for x, freqs in timeline.items() if freqs), default=0)
+        timeline = {x: freqs if freqs else 0 for x in range(stop + 1)}
+        if not non_silent_columns:
+            logger.warning("No valid colors detected in image")
+            return jsonify({"error": "No valid colors detected"}), 400
+        audio_segments = []
+        for x in range(stop + 1):
+            segment = generate_tone(timeline.get(x, 0), brush)
+            audio_segments.append(segment)
+       
+        audio = np.concatenate(audio_segments)
+        audio = audio / np.max(np.abs(audio))
+        audio_int16 = np.int16(audio * 32767)
+        filename = f"sound_{int(time.time() * 1000)}.wav"
+        filepath = os.path.join(OUTPUT_DIR, filename)
+        write_wav(filepath, SAMPLE_RATE, audio_int16)
+        logger.info(f"Generated audio file: {filename}")
+        # Store submission in database
+        insert_query = """
+            INSERT INTO submissions (user_email, submission_date, image_data, audio_path, brush_type, ip_address)
+            OUTPUT INSERTED.submission_id
+            VALUES (?, ?, ?, ?, ?, ?)
+        """
+        cursor.execute(insert_query, (
+            session['user']['email'] if is_authenticated else None,
+            datetime.now(),
+            image_data,
+            filename,
+            brush,
+            request.remote_addr
+        ))
+        submission_id = cursor.fetchone()[0]
+        connection.commit()
+        logger.info(f"Submission {submission_id} stored in database for {submission_key}")
+        # Update billing record with submission_id if applicable
+        if is_authenticated and is_subscribed and submission_count >= FREE_SUBMISSION_LIMIT:
+            cursor.execute("""
+                UPDATE billing_records
+                SET submission_id = ?
+                WHERE submission_id IS NULL AND user_email = ? AND created_at = (SELECT MAX(created_at) FROM billing_records WHERE user_email = ?)
+            """, (submission_id, submission_key, submission_key))
+            connection.commit()
+            logger.info(f"Updated billing record with submission_id {submission_id} for {submission_key}")
+        return jsonify({"url": f"/static/audio/{filename}"})
+    except Exception as e:
+        logger.error(f"Error processing submission: {str(e)}")
+        return jsonify({"error": f"Failed to process submission: {str(e)}"}), 500
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+            logger.info("Database connection closed")
 @app.route('/static/audio/<path:filename>')
 def serve_audio(filename):
+    logger.info(f"Serving audio file: {filename}")
     return send_from_directory(OUTPUT_DIR, filename)
+if __name__ == "__main__":
+    debug = os.getenv('FLASK_DEBUG', 'False').lower() == 'true'
+    port = int(os.getenv('PORT', 8000))
+    app.run(host="0.0.0.0", port=port, debug=debug, use_reloader=False, threaded=False)
+else:
+    application = app # For Gunicor
 
-# ===========================
-# RUN
-# ===========================
-# ===========================
-# RUN (for local only)
-# ===========================
-if __name__ == '__main__':
-    print("\nPIANO IS READY!")
-    print("Go to: http://127.0.0.1:5000/drawing2audio")
-    print("Draw with any color → you will hear your real piano!\n")
-    app.run(host='127.0.0.1', port=5000, debug=False)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
