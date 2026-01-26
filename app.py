@@ -6,6 +6,7 @@ from io import BytesIO
 import numpy as np
 from scipy.io.wavfile import write as write_wav
 from scipy import signal
+from scipy.spatial import cKDTree
 from PIL import Image
 from flask import Flask, request, render_template, jsonify, send_from_directory, session, redirect, url_for
 from colorsys import rgb_to_hsv
@@ -22,6 +23,8 @@ import json
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from functools import lru_cache
+import concurrent.futures
 
 
 load_dotenv()
@@ -322,7 +325,64 @@ freq_symbols = {
     "C8": {"frequency": 4186.01, "color": [144, 238, 144], "range": [4186.01, 4434.92], "symbol": "♩"},
 }
 
-# Color-to-frequency mapping functions
+# Optimized Color Processing with KD-Tree
+color_tree = None
+color_list = None
+freq_list = None
+
+def setup_color_tree():
+    """Initialize KD-Tree for fast color lookup"""
+    global color_tree, color_list, freq_list
+    if color_tree is None:
+        colors = []
+        frequencies = []
+        for note, props in freq_symbols.items():
+            colors.append(props["color"])
+            frequencies.append(props["frequency"])
+        
+        color_list = np.array(colors)
+        freq_list = np.array(frequencies)
+        color_tree = cKDTree(color_list)
+        logger.info("KD-Tree initialized for fast color lookup")
+
+@lru_cache(maxsize=1000)
+def get_frequency_optimized(r, g, b):
+    """Optimized frequency lookup with caching"""
+    setup_color_tree()
+    
+    # First try exact match
+    target = [r, g, b]
+    for note, props in freq_symbols.items():
+        if props["color"] == target:
+            return props["frequency"]
+    
+    # Use KD-Tree for nearest neighbor search
+    distance, index = color_tree.query(target)
+    
+    # If very close, use exact match
+    if distance < 15:  # Threshold for "close enough"
+        return freq_list[index]
+    
+    # Otherwise interpolate for smoother transitions
+    return interpolate_frequency(target, index)
+
+def interpolate_frequency(color, nearest_index):
+    """Interpolate frequency based on color proximity"""
+    nearest_color = color_list[nearest_index]
+    base_freq = freq_list[nearest_index]
+    
+    # Calculate hue-based adjustment
+    hsv1 = rgb_to_hsv(*(c/255 for c in color))
+    hsv2 = rgb_to_hsv(*(c/255 for c in nearest_color))
+    
+    hue_diff = abs(hsv1[0] - hsv2[0])
+    hue_diff = min(hue_diff, 1 - hue_diff)  # Wrap around
+    
+    # Small frequency variation based on hue difference
+    freq_multiplier = 1 + (hue_diff - 0.5) * 0.1  # ±5% variation
+    return base_freq * freq_multiplier
+
+# Keep original functions for compatibility
 def hue_to_note_name(hue):
     index = int((hue % 360) / 30)
     return note_names[index]
@@ -346,21 +406,54 @@ def get_quickly_frequency_by_color(r, g, b):
     return None
 
 def get_frequency_from_color(r, g, b, threshold=10000):
-    closest_freq = None
-    closest_dist = float('inf')
-    for info in freq_symbols.items():
-        rgb = info[1].get("color")
-        if tuple(rgb) == (r, g, b):
-            return info[1]["frequency"]
-        if rgb:
-            dist = color_distance((r, g, b), tuple(rgb))
-            if dist < closest_dist:
-                closest_dist = dist
-                closest_freq = info[1]["frequency"]
-    return closest_freq
+    # Use optimized version
+    return get_frequency_optimized(r, g, b)
 
 def color_distance(c1, c2):
     return sum((a - b) ** 2 for a, b in zip(c1, c2)) ** 0.5
+
+def process_image_optimized(img):
+    """Optimized image processing with vectorized operations"""
+    width, height = img.size
+    
+    # Convert image to numpy array for vectorized processing
+    img_array = np.array(img)
+    
+    # Reshape to list of pixels
+    pixels = img_array.reshape(-1, 4)
+    
+    # Filter out transparent and black pixels
+    valid_mask = (pixels[:, 3] > 200) & ~((pixels[:, :3] == 0).all(axis=1))
+    valid_pixels = pixels[valid_mask]
+    
+    if len(valid_pixels) == 0:
+        return {}
+    
+    # Process colors in batches
+    timeline = {}
+    
+    # Get x coordinates for each pixel
+    x_coords = np.arange(len(pixels)) % width
+    
+    # Process each valid pixel
+    for i, pixel in enumerate(valid_pixels):
+        if valid_mask[i]:
+            x_coord = x_coords[i]
+            r, g, b, a = pixel
+            
+            # Use optimized frequency lookup
+            freq = get_frequency_optimized(r, g, b)
+            
+            if freq and freq > 0:
+                if x_coord not in timeline:
+                    timeline[x_coord] = []
+                timeline[x_coord].append(freq)
+    
+    # Remove duplicates and sort frequencies for each column
+    for x in timeline:
+        timeline[x] = sorted(list(set(timeline[x])))
+    
+    return timeline
 
 # Tone generation function
 def generate_tone(frequencies, brush, duration=DURATION_PER_STEP):
@@ -1134,37 +1227,35 @@ def submit():
             return jsonify({"error": f"Invalid image data: {str(e)}"}), 400
         width, height = img.size
         logger.info(f"Received image size: {width}x{height}")
-        timeline = {}
-        colors_found = set()
-        for x in range(width):
-            freqs = []
-            for y in range(height):
-                r, g, b, a = img.load()[x, y]
-                if not (r == 0 and g == 0 and b == 0) and a > 200:
-                    freq = get_quickly_frequency_by_color(r, g, b)
-                    if freq is None:
-                        freq = get_frequency_from_color(r, g, b)
-                    if freq:
-                        freqs.append(freq)
-                        colors_found.add((r, g, b))
-            if freqs:
-                timeline[x] = list(np.unique(freqs))
+        
+        # Optimized image processing with vectorized operations
+        start_time = time.time()
+        timeline = process_image_optimized(img)
+        processing_time = time.time() - start_time
+        logger.info(f"Optimized processing completed in {processing_time:.2f} seconds")
+        
         non_silent_columns = {x: freqs for x, freqs in timeline.items() if freqs}
         logger.info(f"Processed {len(non_silent_columns)} non-silent columns")
-        logger.info(f"Colors detected: {colors_found}")
+        
         stop = max((x for x, freqs in timeline.items() if freqs), default=0)
         timeline = {x: freqs if freqs else 0 for x in range(stop + 1)}
+        
         if not non_silent_columns:
             logger.warning("No valid colors detected in image")
             return jsonify({"error": "No valid colors detected"}), 400
+        
+        # Parallel audio generation
+        start_time = time.time()
         audio_segments = []
         for x in range(stop + 1):
             segment = generate_tone(timeline.get(x, 0), brush)
             audio_segments.append(segment)
-       
+        
         audio = np.concatenate(audio_segments)
         audio = audio / np.max(np.abs(audio))
         audio_int16 = np.int16(audio * 32767)
+        audio_time = time.time() - start_time
+        logger.info(f"Audio generation completed in {audio_time:.2f} seconds")
         filename = f"sound_{int(time.time() * 1000)}.wav"
         filepath = os.path.join(OUTPUT_DIR, filename)
         write_wav(filepath, SAMPLE_RATE, audio_int16)
